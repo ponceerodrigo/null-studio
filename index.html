@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>NULL Studio · Control de proyectos</title>
+<style>
+:root{--bg:#e6e9ed;--pn:#f4f6f8;--cd:#fff;--tx:#12171c;--mu:#5a646f;--ln:#cbd1d8;--ac:#2447d6;--dg:#c8341f;--ok:#17803d;--r:6px;color-scheme:light}
+[data-t=dark]{--bg:#0e1216;--pn:#161b21;--cd:#1e252c;--tx:#e6eaee;--mu:#8d98a4;--ln:#2d3640;--ac:#7d98ff;--dg:#ff7a63;--ok:#4cc17c;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Bahnschrift,"Segoe UI",system-ui,sans-serif;transition:background .25s,color .25s}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+input,select,textarea{background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:7px 9px;width:100%}
+:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+[hidden]{display:none!important}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:var(--pn);border-bottom:1px solid var(--ln);position:sticky;top:0;z-index:20}
+h1{margin:0;font-size:21px;letter-spacing:.5px;font-weight:300}h1 b{color:var(--ac);font-weight:700}
+.tabs{display:flex;gap:4px;flex:1}
+.b{border:1px solid var(--ln);background:var(--cd);padding:6px 12px;border-radius:var(--r);font-weight:600;transition:background .15s,border-color .15s}
+.b:hover{border-color:var(--ac)}.b.on,.b.p{background:var(--ac);border-color:var(--ac);color:#fff}[data-t=dark] .b.on,[data-t=dark] .b.p{color:#0e1216}
+.b.g{background:var(--ok);border-color:var(--ok);color:#fff}.b.d{color:var(--dg)}
+.ib{border:0;background:none;color:var(--mu);padding:2px 6px;border-radius:4px}.ib:hover{background:var(--ln);color:var(--tx)}
+.tools{display:flex;gap:6px;align-items:center}
+.crumb{font-weight:600;color:var(--ac)}.crumb span{color:var(--mu);font-weight:400}
+main{padding:16px 18px}
+.board{display:flex;gap:14px;overflow-x:auto;align-items:flex-start;padding-bottom:16px}
+.col{background:var(--pn);border:1px solid var(--ln);border-radius:var(--r);width:300px;min-width:300px;padding:8px;display:flex;flex-direction:column;max-height:calc(100vh - 130px)}
+.col header{display:flex;align-items:center;gap:4px;padding:2px 2px 8px}
+.col header input{border-color:transparent;background:none;font-weight:700;padding:3px 5px}.col header input:focus{background:var(--cd);border-color:var(--ac)}
+.n{color:var(--mu);font-size:12px}
+.cl{overflow-y:auto;min-height:24px;padding:2px;flex:1}.cl.over{outline:2px dashed var(--ac);outline-offset:-2px}
+.cd{background:var(--cd);border:1px solid var(--ln);border-left:4px solid var(--ac);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:transform .15s,border-color .15s}
+.cd:hover{transform:translateY(-1px);border-color:var(--ac)}.cd.drag{opacity:.35}.cd.cc{color:#12171c}
+.cd .t{display:flex;justify-content:space-between;gap:6px;font-weight:600}
+.cd .m{font-size:12px;color:var(--mu);margin-top:4px}.cd.cc .m{color:#3b444d}
+.add,.addcol{border:0;background:none;color:var(--mu);text-align:left;padding:8px;border-radius:var(--r);font-weight:600}
+.add:hover{background:var(--ln);color:var(--tx)}
+.addcol{min-width:260px;border:2px dashed var(--ln);text-align:center;color:var(--tx)}.addcol:hover{border-color:var(--ac)}
+#vp{position:relative;height:calc(100vh - 150px);min-height:420px;overflow:hidden;background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);cursor:grab;touch-action:none;background-image:radial-gradient(var(--ln) 1px,transparent 1px);background-size:24px 24px}
+#vp.pan{cursor:grabbing}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#world svg{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+#world line{stroke:var(--ac);stroke-width:2.5;pointer-events:stroke;cursor:pointer}#world line:hover{stroke:var(--dg);stroke-width:4}
+.nd{position:absolute;width:220px;background:var(--pn);border:2px solid var(--ac);border-radius:var(--r);padding:10px 12px;cursor:move;user-select:none;box-shadow:0 3px 10px #0002}
+.nd.cc{color:#12171c}.nd h4{margin:0 0 2px;font-size:14px}.nd small{color:var(--mu)}.nd.cc small{color:#3b444d}
+.nd div{display:flex;justify-content:space-between;margin-top:8px;padding-top:6px;border-top:1px solid #8884}
+.nd button{border:0;background:none;color:var(--ac);font-weight:700;padding:0}.nd.cc button{color:#1a36a8}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;z-index:3}
+.hint{font-size:12px;color:var(--mu);margin:0 0 8px}
+.md{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
+.mb{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:20px;width:760px;max-width:100%;max-height:92vh;overflow:auto;animation:in .18s ease-out}
+@keyframes in{from{transform:translateY(10px);opacity:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.mb h3{margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--ac)}
+.f{margin-bottom:10px}.f label,.lb{display:block;font-size:12px;font-weight:600;color:var(--mu);margin-bottom:3px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.box{background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:10px;margin-bottom:10px}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--ln);flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}td,th{border:1px solid var(--ln);padding:3px 5px;text-align:left}th{background:var(--cd);font-size:12px}
+td input{border:0;padding:4px;background:none}td.r{text-align:right;white-space:nowrap}
+.tot{font-size:22px;font-weight:700;color:var(--ac);text-align:right}
+#toasts{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:99;max-width:92vw}
+.ts{background:var(--tx);color:var(--bg);padding:9px 14px;border-radius:var(--r);display:flex;gap:12px;align-items:center;animation:in .2s}.ts.err{background:var(--dg);color:#fff}
+.ts button{background:none;border:1px solid currentColor;color:inherit;border-radius:4px;padding:2px 8px}
+#gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+#gate form{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:28px;width:360px;max-width:100%}
+#gate h2{margin:0 0 6px;font-weight:300;font-size:26px}#gate h2 b{color:var(--ac)}#gate p{color:var(--mu);margin:0 0 14px}
+#gate .b{width:100%;margin-top:10px;padding:9px}#gerr{color:var(--dg);min-height:20px;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="gate"><form id="gf" autocomplete="off">
+<h2>NULL <b>Studio</b></h2><p id="gp"></p>
+<input type="password" id="gk" placeholder="Clave" autocomplete="current-password" required>
+<input type="password" id="gk2" placeholder="Repetir clave" hidden>
+<div id="gcw" hidden style="margin-top:10px"><input id="gu" placeholder="Project URL (https://xxxx.supabase.co)"><input id="gak" placeholder="Clave anon / publishable" style="margin-top:6px"></div>
+<button type="button" class="b" id="gcl">☁️ Usar datos de la nube</button>
+<button class="b p" id="gb">Entrar</button><div id="gerr" role="alert"></div>
+</form></div>
+
+<div id="app" hidden>
+<header class="top">
+ <h1>NULL <b>Studio</b></h1>
+ <nav class="tabs" id="nav"></nav>
+ <div class="tools">
+  <button class="b" data-act="cloud" id="bcl" title="Sincronización en la nube">☁️</button>
+  <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro"></button>
+  <button class="b" data-act="export" title="Descargar respaldo cifrado">💾 Respaldo</button>
+  <label class="b" title="Cargar respaldo (.json)">📂 Cargar<input type="file" id="imp" accept=".json" hidden></label>
+  <button class="b" data-act="restore" title="Volver a la copia anterior">↩ Copia previa</button>
+  <button class="b" data-act="lock">🔒</button>
+ </div>
+</header>
+<main id="main"></main>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s),LS=localStorage,VK='nl_vault',PK='nl_vault_prev',OLD='null_lab_project_data_v14';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=p=>p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+/* Dinero en centavos enteros: sin errores de coma flotante */
+const cents=(q,p)=>Math.round(parseFloat(((+q||0)*(+p||0)*100).toPrecision(12)));
+const fmt=c=>'$'+(c/100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)&&n>=0?n:0};
+
+/* ---------- Bóveda cifrada (AES-GCM + PBKDF2) ---------- */
+const te=new TextEncoder(),td=new TextDecoder();
+let S,KEY,SALT,SNAP=null,tmr;
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode(...u.subarray(i,i+8192));return btoa(s)};
+const unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function derive(pw,salt){const k=await crypto.subtle.importKey('raw',te.encode(pw),'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function seal(o){const iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},KEY,te.encode(JSON.stringify(o))));
+ return{v:1,s:b64(SALT),i:b64(iv),d:b64(ct)}}
+async function unseal(b,key){return JSON.parse(td.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb(b.i)},key,unb(b.d))))}
+const save=()=>{clearTimeout(tmr);tmr=setTimeout(flush,250)};
+async function flush(){if(!KEY||!S)return;try{LS.setItem(VK,JSON.stringify(await seal(S)))}catch(e){toast('No se pudo guardar ('+e.message+'). Descargá un respaldo ya.','err');return}
+ if(CL()&&VID){LS.setItem('nl_dirty','1');push()}}
+
+/* ---------- Nube (Supabase REST): solo guarda el blob cifrado ---------- */
+let VID=null,CREV=null,CONF=false,Q=Promise.resolve();
+const CL=()=>{try{return JSON.parse(LS.getItem('nl_cloud'))}catch{return null}};
+const H=c=>Object.assign({apikey:c.key,'Content-Type':'application/json'},c.key.startsWith('eyJ')?{Authorization:'Bearer '+c.key}:{});
+async function vid(pw){const k=await crypto.subtle.importKey('raw',te.encode(pw),'PBKDF2',false,['deriveBits']);
+ const b=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:te.encode('nl-vault-id-v1'),iterations:250000,hash:'SHA-256'},k,256));return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
+async function cget(){const c=CL(),r=await fetch(`${c.url}/rest/v1/vault?id=eq.${VID}&select=data,rev`,{headers:H(c)});
+ if(!r.ok)throw new Error(r.status===404?'falta crear la tabla (ver SQL en ☁️)':r.status===401||r.status===403?'clave de Supabase rechazada':'error '+r.status);return(await r.json())[0]||null}
+function setCS(k){const b=$('#bcl');if(b)b.textContent={ok:'☁️ ✓',off:'☁️ ⚠',conf:'☁️ ✗',none:'☁️'}[k]}
+const push=()=>Q=Q.then(pushOnce);
+async function pushOnce(){const c=CL();if(!c||!VID||!KEY||CONF)return;const box=JSON.parse(LS.getItem(VK));
+ try{const o={headers:Object.assign(H(c),{Prefer:'return=representation'})};
+  const r=CREV===null?await fetch(`${c.url}/rest/v1/vault`,{...o,method:'POST',body:JSON.stringify({id:VID,data:box,rev:1})})
+   :await fetch(`${c.url}/rest/v1/vault?id=eq.${VID}&rev=eq.${CREV}`,{...o,method:'PATCH',body:JSON.stringify({data:box,rev:CREV+1})});
+  const j=r.ok?await r.json():null;
+  if(r.status===409||(j&&!j.length)){CONF=true;setCS('conf');return toast('Otra PC guardó cambios en la nube. Abrí ☁️ para elegir qué versión conservar. Lo tuyo sigue guardado en esta PC.','err')}
+  if(!r.ok)throw new Error(r.status);
+  CREV=j[0].rev;LS.setItem('nl_rev',CREV);LS.removeItem('nl_dirty');setCS('ok')
+ }catch{setCS('off');toast('Sin conexión a la nube: guardado solo en esta PC. Se sube al volver.','err')}}
+async function applyRow(row,pw){let k=KEY,sl=SALT;
+ if(!(SALT&&row.data.s===b64(SALT))){if(!pw)throw new Error('Reingresá tu clave para traer estos datos.');sl=unb(row.data.s);k=await derive(pw,sl)}
+ let d;try{d=normalize(await unseal(row.data,k))}catch{throw new Error('Clave incorrecta para los datos de la nube.')}
+ const v=LS.getItem(VK);if(v)LS.setItem(PK,v);SNAP=S?structuredClone(S):null;
+ KEY=k;SALT=sl;S=d;CREV=row.rev;LS.setItem(VK,JSON.stringify(row.data));LS.setItem('nl_rev',CREV);LS.removeItem('nl_dirty');CONF=false}
+async function pullNow(pw){const row=await cget();if(!row)throw new Error('la nube está vacía');await applyRow(row,pw);if(F&&!locate(F))F=null;closeM();render();setCS('ok')}
+addEventListener('online',()=>{if(KEY&&LS.getItem('nl_dirty'))push()});
+addEventListener('focus',async()=>{if(!KEY||!CL()||!VID||document.querySelector('.md'))return;
+ try{const r=await cget();if(!r||r.rev<=(CREV??0))return;
+  if(LS.getItem('nl_dirty')||CONF||r.data.s!==b64(SALT)){CONF=true;setCS('conf');return toast('Otra PC subió cambios. Abrí ☁️ para elegir qué versión conservar.','err')}
+  await applyRow(r);if(F&&!locate(F))F=null;render();setCS('ok');toast('Se cargaron cambios de la nube.','',undo)}catch{}});
+async function enableCloud(url,key){const pw=prompt('Reingresá tu clave para activar la nube:');if(!pw)return;
+ try{await unseal(JSON.parse(LS.getItem(VK)),await derive(pw,SALT))}catch{return toast('Clave incorrecta.','err')}
+ const prev=LS.getItem('nl_cloud'),pv=VID;LS.setItem('nl_cloud',JSON.stringify({url:url.trim().replace(/\/+$/,''),key:key.trim()}));VID=await vid(pw);
+ try{const row=await cget();CONF=false;CREV=null;
+  if(row){if(!confirm('Ya hay datos en la nube. Aceptar = traerlos (reemplazan lo de esta PC; queda copia previa). Cancelar = no activar.')){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');VID=pv;return}
+   await applyRow(row,pw);F=null;render()}
+  else{LS.setItem('nl_dirty','1');await push()}
+  setCS('ok');closeM();toast('Nube activada.')}catch(x){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');VID=pv;toast('No se pudo conectar: '+x.message,'err')}}
+function cloudModal(){const c=CL()||{url:'',key:''};
+ const sql='create table vault (id text primary key, data jsonb not null, rev bigint not null default 1);\nalter table vault enable row level security;\ncreate policy "ins" on vault for insert to anon with check (true);\ncreate policy "sel" on vault for select to anon using (true);\ncreate policy "upd" on vault for update to anon using (true) with check (true);';
+ const m=modal(`<h3>☁️ Sincronización en la nube</h3><p>Se sube una copia <b>cifrada con tu clave</b>: el servidor solo guarda texto ilegible. Con una cuenta gratuita de Supabase: creá un proyecto, abrí <i>SQL Editor</i>, ejecutá esto y pegá abajo la <i>Project URL</i> y la clave <i>anon / publishable</i> (Project Settings → API).</p>
+ <pre style="background:var(--cd);border:1px solid var(--ln);border-radius:6px;padding:10px;font-size:12px;overflow:auto">${esc(sql)}</pre>
+ <div class="row"><div class="f"><label>Project URL</label><input id="cu" value="${esc(c.url)}" placeholder="https://xxxx.supabase.co"></div><div class="f"><label>Clave anon / publishable</label><input id="ck" value="${esc(c.key)}"></div></div>
+ <p class="hint">${CL()?(VID?(CONF?'Conflicto: otra PC guardó cambios.':'Activa · revisión '+(CREV??'-')):'Configurada: cerrá con 🔒 y entrá de nuevo.'):'Sin configurar: los datos quedan solo en este navegador.'}</p>
+ <div class="acts"><button class="b" data-act="closeM">Cerrar</button><button class="b" id="cpull">Traer de la nube</button><button class="b" id="cforce">Subir esta versión</button><button class="b p" id="csave">Guardar y activar</button></div>`,'720px');
+ const T=f=>async()=>{try{await f()}catch(x){toast(x.message,'err')}},need=()=>{if(!CL()||!VID)throw new Error('Activá la nube primero.')};
+ m.querySelector('#csave').onclick=T(()=>enableCloud(m.querySelector('#cu').value,m.querySelector('#ck').value));
+ m.querySelector('#cpull').onclick=T(async()=>{need();if(!confirm('Reemplaza los datos de esta PC por los de la nube (queda copia previa). ¿Continuar?'))return;
+  let pw=null;const r=await cget();if(r&&r.data.s!==b64(SALT)){pw=prompt('Clave:');if(!pw)return}await pullNow(pw);toast('Datos traídos de la nube.','',undo)});
+ m.querySelector('#cforce').onclick=T(async()=>{need();if(!confirm('Reemplaza lo que hay en la nube por la versión de esta PC. ¿Continuar?'))return;
+  const r=await cget();CREV=r?r.rev:null;CONF=false;LS.setItem('nl_dirty','1');await push();closeM()})}
+function mark(){SNAP=structuredClone(S);const v=LS.getItem(VK);if(v)LS.setItem(PK,v)}
+const undo=()=>{if(SNAP){S=SNAP;SNAP=null;render();save()}};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
+addEventListener('storage',e=>{if(e.key===VK&&KEY)toast('Otra pestaña modificó los datos. Recargá para no pisarlos.','err')});
+
+const demo=()=>({columns:[{id:'c1',title:'Ideas / Backlog',cards:[]},{id:'c2',title:'En proceso',cards:[]},{id:'c3',title:'Completado',cards:[]}],connections:[],templates:[]});
+function normalize(d){
+ if(!d||!Array.isArray(d.columns))throw new Error('Formato inválido');
+ d.connections=Array.isArray(d.connections)?d.connections:[];d.templates=d.templates||[];
+ let x=50,y=50;
+ d.columns.forEach(c=>(c.cards=c.cards||[]).forEach(k=>{
+  if(k.x===undefined||k.y===undefined){k.x=x;k.y=y;x+=260;if(x>900){x=50;y+=180}}
+  k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
+  k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});}));
+ return d}
+function nextNum(d){let m=1442;(d||S).columns.forEach(c=>c.cards.forEach(k=>{const n=parseInt(k.budgetData&&k.budgetData.num);if(n>m)m=n}));return String(m+1)}
+function bdef(d){return{num:nextNum(d),clientName:'',clientCuit:'',condIva:'Consumidor Final',date:new Date().toISOString().slice(0,10),dueDate:'',
+ designDesc:'Modelado CAD 3D, ingeniería de detalle y planos',designHours:0,designRate:15,notes:'Validez de oferta: 7 días. Pago: 50% anticipo, 50% contra entrega.',
+ style:{studio:'NULL STUDIO',sub:'Diseño y Fabricación Industrial | Córdoba, Argentina',accent:'#0079bf'},items:[]}}
+
+/* ---------- Acceso ---------- */
+let isNew=!LS.getItem(VK);
+$('#gp').textContent=isNew?'Primera vez: creá una clave. Cifra tus datos en este dispositivo; si la perdés, no hay recuperación (usá respaldos).':'Ingresá tu clave para abrir los proyectos.';
+$('#gk2').hidden=!isNew;$('#gk2').required=isNew;$('#gb').textContent=isNew?'Crear clave y entrar':'Entrar';
+if(!crypto.subtle)$('#gerr').textContent='Este navegador necesita HTTPS (o localhost) para cifrar.';
+$('#gcl').onclick=()=>{const w=$('#gcw');w.hidden=!w.hidden;const c=CL();if(c){$('#gu').value=c.url;$('#gak').value=c.key}};
+$('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#gerr');err.textContent='';$('#gb').disabled=true;
+ try{
+  if(!$('#gcw').hidden&&$('#gu').value.trim())LS.setItem('nl_cloud',JSON.stringify({url:$('#gu').value.trim().replace(/\/+$/,''),key:$('#gak').value.trim()}));
+  const cl=CL();let row=null,off=false;CREV=null;CONF=false;VID=cl?await vid(pw):null;
+  if(cl){try{row=await cget()}catch(x){if(isNew)throw new Error('No se pudo leer la nube: '+x.message);off=true}}
+  if(isNew&&row)await applyRow(row,pw);
+  else if(isNew){
+   if(pw.length<6)throw new Error('Usá al menos 6 caracteres.');
+   if(pw!==$('#gk2').value)throw new Error('Las claves no coinciden.');
+   SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await derive(pw,SALT);
+   let old=null;try{old=JSON.parse(LS.getItem(OLD))}catch{}
+   S=normalize(old&&old.columns?old:demo());await flush();
+   if(old&&await unseal(JSON.parse(LS.getItem(VK)),KEY)){LS.removeItem(OLD);toast('Datos anteriores migrados y cifrados.')}
+  }else{
+   const box=JSON.parse(LS.getItem(VK));SALT=unb(box.s);KEY=await derive(pw,SALT);
+   try{S=normalize(await unseal(box,KEY))}catch{KEY=null;throw new Error('Clave incorrecta.')}
+   if(row){const lr=+LS.getItem('nl_rev')||0,dirty=!!LS.getItem('nl_dirty');
+    if(row.rev>lr&&(!dirty||confirm('La nube tiene una versión más nueva y esta PC tiene cambios sin subir.\nAceptar = usar la nube (queda copia previa). Cancelar = conservar lo de esta PC.')))await applyRow(row,pw);
+    else{CREV=row.rev;if(row.rev>lr)CONF=true}}
+  }
+  isNew=false;$('#gate').hidden=true;$('#app').hidden=false;$('#gf').reset();F=null;render();
+  setCS(!cl?'none':CONF?'conf':off?'off':'ok');
+  if(CONF)toast('Conflicto con la nube: abrí ☁️ para elegir qué versión conservar.','err');
+  else if(cl&&(off||(!isNew&&LS.getItem('nl_dirty'))||(row===null&&!off)))push();
+ }catch(x){err.textContent=x.message}$('#gb').disabled=false};
+
+/* ---------- Utilidades de estado ---------- */
+let F=null,VIEW='board';
+function locate(id){for(const c of S.columns)for(const k of c.cards){if(k.id===id)return{c:k,list:c};for(const f of k.folderColumns)for(const s of f.cards)if(s.id===id)return{c:s,list:f,parent:k}}}
+const cur=()=>F?locate(F).c.folderColumns:S.columns;
+const allCards=()=>S.columns.flatMap(c=>c.cards.map(k=>({k,col:c})));
+function toast(m,kind,fn){const t=document.createElement('div');t.className='ts '+(kind||'');t.append(m);
+ if(fn){const b=document.createElement('button');b.textContent='Deshacer';b.onclick=()=>{fn();t.remove()};t.append(b)}
+ $('#toasts').append(t);setTimeout(()=>t.remove(),kind==='err'||fn?9000:4000)}
+function applyTheme(){const th=LS.getItem('nl_theme')||'auto';
+ document.documentElement.dataset.t=th==='auto'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):th;
+ const b=$('#bth');if(b)b.textContent={auto:'🌗 Auto',light:'☀️ Claro',dark:'🌙 Oscuro'}[th]}
+applyTheme();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyTheme);
+
+/* ---------- Render ---------- */
+function render(){
+ $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(locate(F).c.title)}</span><button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`
+  :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>`;
+ const m=$('#main');
+ if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
+  <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
+ m.innerHTML=`<div class="board">${cur().map(l=>`<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
+  <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div><button class="add" data-act="addCard" data-l="${l.id}">+ Añadir tarjeta</button></section>`).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`}
+const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
+function cardHTML(c){const meta=F?(c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'')):
+ (n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0));
+ return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${F?'':'📁 '}${esc(c.title)}</span><span>${F?'':`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
+
+/* ---------- Eventos ---------- */
+const A={
+ theme(){const o=['auto','light','dark'],c=LS.getItem('nl_theme')||'auto';LS.setItem('nl_theme',o[(o.indexOf(c)+1)%3]);applyTheme()},
+ view(a){VIEW=a.dataset.v;render()},home(){F=null;render()},
+ lock(){flush().then(()=>{S=KEY=VID=null;$('#app').hidden=true;$('#gate').hidden=false;$('#gk').value='';$('#gk').focus()})},
+ addList(){const t=prompt('Nombre de la nueva lista:');if(t){cur().push({id:uid('l'),title:t,cards:[]});save();render()}},
+ delList(a){const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
+  mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
+ addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
+  const k={id,title:F?'Nuevo ítem':'Nuevo proyecto',color:'#ffffff',qty:1,unitPrice:0,fields:[],folderColumns:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
+   x:50+(allCards().length%4)*260,y:50+Math.floor(allCards().length/4)*180};k.budgetData=bdef();l.cards.push(k);save();render();A.edit({dataset:{id}})},
+ delCard(a){mark();const r=locate(a.dataset.id);r.list.cards.splice(r.list.cards.indexOf(r.c),1);S.connections=S.connections.filter(c=>c.from!==r.c.id&&c.to!==r.c.id);save();render();toast(`"${r.c.title}" eliminada.`,'',undo)},
+ open(a){F=a.dataset.id;VIEW='board';render()},
+ edit(a){editCard(a.dataset.id)},budget(a){budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
+ export(){flush().then(()=>{const b=new Blob([LS.getItem(VK)],{type:'application/json'});dl(b,'null_studio_respaldo_'+new Date().toISOString().slice(0,10)+'.json');toast('Respaldo cifrado descargado. Se abre con tu clave.')})},
+ restore(){const p=LS.getItem(PK);if(!p)return toast('Todavía no hay copia previa.','err');
+  if(!confirm('Se reemplazan los datos actuales por la copia previa (guardada antes de tu último borrado o importación). ¿Continuar?'))return;
+  unseal(JSON.parse(p),KEY).then(d=>{mark();S=normalize(d);F=null;save();render();toast('Copia previa restaurada.','',undo)}).catch(()=>toast('La copia previa no se pudo abrir con esta clave.','err'))},
+ cloud(){cloudModal()},zoom(a){zoomAt(+a.dataset.d,vp().clientWidth/2,vp().clientHeight/2)},fit(){fitView()},
+ closeM(){closeM()}
+};
+document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
+ const c=e.target.closest('.cd');if(c&&!F)A.open({dataset:{id:c.dataset.id}});else if(c&&F)editCard(c.dataset.id)});
+document.addEventListener('change',e=>{if(e.target.dataset.ren){const l=cur().find(x=>x.id===e.target.dataset.ren);l.title=e.target.value||'Lista';save()}});
+let dragId=null;
+document.addEventListener('dragstart',e=>{const c=e.target.closest?.('.cd');if(c){dragId=c.dataset.id;c.classList.add('drag');e.dataTransfer.setData('text/plain',dragId)}});
+document.addEventListener('dragend',()=>{dragId=null;document.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over'))});
+document.addEventListener('dragover',e=>{const d=e.target.closest?.('.cl');if(d&&dragId){e.preventDefault();d.classList.add('over')}});
+document.addEventListener('dragleave',e=>e.target.classList?.remove('over'));
+document.addEventListener('drop',e=>{const d=e.target.closest?.('.cl');if(!d||!dragId)return;e.preventDefault();
+ const to=cur().find(l=>l.id===d.dataset.drop),from=cur().find(l=>l.cards.some(c=>c.id===dragId));
+ if(to&&from){const c=from.cards.splice(from.cards.findIndex(c=>c.id===dragId),1)[0];to.cards.push(c);save();render()}});
+$('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{let j=JSON.parse(await f.text()),d;
+  if(j.d&&j.s){try{d=await unseal(j,KEY)}catch{const pw=prompt('Este respaldo usa otra clave. Ingresala:');if(!pw)return;d=await unseal(j,await derive(pw,unb(j.s)))}}else d=j;
+  d=normalize(d);const n=d.columns.reduce((a,c)=>a+c.cards.length,0);
+  if(!confirm(`El archivo tiene ${d.columns.length} listas y ${n} proyectos. Reemplaza los datos actuales (queda una copia previa para volver). ¿Importar?`))return;
+  mark();S=d;F=null;save();render();toast('Datos importados.','',undo)
+ }catch(x){toast('No se pudo importar: archivo dañado o clave incorrecta.','err')}};
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+
+/* ---------- Modales ---------- */
+function modal(html,w){closeM();const m=document.createElement('div');m.className='md';m.innerHTML=`<div class="mb" style="${w?'width:'+w:''}" role="dialog" aria-modal="true">${html}</div>`;
+ m.addEventListener('mousedown',e=>{if(e.target===m)closeM()});document.body.append(m);return m.firstChild}
+function closeM(){document.querySelectorAll('.md').forEach(m=>m.remove())}
+addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+function editCard(id){const r=locate(id);if(!r)return;const c=r.c;
+ const fld=(l,v)=>`<div class="box fl"><input class="fk" placeholder="Título del campo" value="${esc(l)}"><textarea class="fv" rows="2" placeholder="Detalle…">${esc(v)}</textarea><button class="b d" type="button" onclick="this.parentNode.remove()">Quitar campo</button></div>`;
+ const m=modal(`<h3>Propiedades</h3><div class="f"><label>Nombre</label><input id="e1" value="${esc(c.title)}"></div>
+ <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div><div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>
+ <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div></div>
+ ${r.parent?'':`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`}
+ <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
+ <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`,'560px');
+ m.querySelector('#ebud')?.addEventListener('click',()=>{m.querySelector('#ok').click();budgetModal(id)});
+ m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
+ m.querySelector('#ok').onclick=()=>{c.title=m.querySelector('#e1').value.trim()||'Sin título';c.qty=num(m.querySelector('#e2').value);c.unitPrice=num(m.querySelector('#e3').value);c.color=m.querySelector('#e4').value;
+  c.fields=[...m.querySelectorAll('.fl')].map(b=>({label:b.querySelector('.fk').value,value:b.querySelector('.fv').value})).filter(f=>f.label||f.value);save();closeM();render()};
+ m.querySelector('#e1').select()}
+function linkModal(id){const me=locate(id).c,opts=allCards().filter(x=>x.k.id!==id).map(x=>`<option value="${x.k.id}">${esc(x.k.title)} (${esc(x.col.title)})</option>`).join('');
+ if(!opts)return toast('Necesitás al menos dos proyectos para conectar.','err');
+ const m=modal(`<h3>Conectar «${esc(me.title)}»</h3><div class="f"><label>Con el proyecto</label><select id="lt">${opts}</select></div><div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Crear enlace</button></div>`,'420px');
+ m.querySelector('#ok').onclick=()=>{const to=m.querySelector('#lt').value;if(!S.connections.some(c=>c.from===id&&c.to===to)){S.connections.push({from:id,to});save();lines()}closeM()}}
+
+/* ---------- Presupuesto ---------- */
+function budgetModal(id){const c=locate(id).c;const B=c.budgetData=Object.assign(bdef(),c.budgetData);B.style=Object.assign({},bdef().style,B.style);
+ const inp=(k,l,t)=>`<div class="f"><label>${l}</label><input data-b="${k}" type="${t||'text'}" value="${esc(B[k])}"></div>`,sin=(k,l,t)=>`<div class="f"><label>${l}</label><input data-s="${k}" type="${t||'text'}" value="${esc(B.style[k])}"></div>`;
+ const m=modal(`<h3>Presupuesto · ${esc(c.title)}</h3>
+ <div class="box row" style="align-items:end"><div class="f" style="margin:0"><label>Plantilla</label><select id="tp"><option value="">— elegir plantilla —</option>${S.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
+  <button class="b" id="tpApply">Aplicar</button><button class="b" id="tpSave">Guardar actual como plantilla</button><button class="b d" id="tpDel">Borrar plantilla</button></div>
+ <details class="box"><summary><b>Estilo del documento</b> (membrete y color)</summary><div class="row" style="margin-top:8px">${sin('studio','Nombre del estudio')}${sin('sub','Subtítulo')}${sin('accent','Color de acento','color')}</div></details>
+ <div class="row">${inp('num','Nº')}${inp('clientName','Cliente')}${inp('clientCuit','CUIT/CUIL')}${inp('condIva','Cond. IVA')}${inp('date','Fecha','date')}${inp('dueDate','Vencimiento','date')}</div>
+ <div class="box"><div class="row" style="align-items:end"><div style="flex:3">${inp('designDesc','Concepto de diseño')}</div>${inp('designHours','Horas','number')}${inp('designRate','$ por hora','number')}<div class="f"><label>Total diseño</label><b id="dT"></b></div></div></div>
+ <table><thead><tr><th>Ítem / especificaciones</th><th style="width:80px">Cant.</th><th style="width:120px">Unit. ($)</th><th style="width:120px">Total</th><th style="width:30px"></th></tr></thead><tbody id="bt"></tbody></table>
+ <button class="b" id="addI" style="width:100%;margin:6px 0 10px">+ Añadir ítem</button>
+ <div class="row" style="align-items:end"><div class="f" style="flex:3"><label>Notas al pie</label><input data-b="notes" value="${esc(B.notes)}"></div><div><div class="lb" style="text-align:right">TOTAL</div><div class="tot" id="gT"></div></div></div>
+ <div class="box"><div class="row" style="align-items:center"><div style="flex:3"><b>Formato Excel</b> · <span id="fxN">${S.xlsx?'📄 '+esc(S.xlsx.name):'diseño básico de NULL Studio'}</span><div class="hint" style="margin:2px 0 0">Descargá el formato, cambiale colores, logo y fuentes en Excel, y subilo: todos los presupuestos salen con ese estilo. Las marcas como <code>{{cliente}}</code> o <code>{{total}}</code> indican dónde va cada dato (la hoja «Instrucciones» las explica).</div></div></div>
+  <div class="row" style="margin-top:8px"><button class="b" id="fxDl">⬇ Descargar formato para editar</button><label class="b" style="text-align:center">📤 Subir mi formato (.xlsx)<input type="file" id="fxUp" accept=".xlsx" hidden></label>${S.xlsx?'<button class="b d" id="fxDel">Volver al diseño básico</button>':''}</div></div>
+ <div class="acts"><button class="b" data-act="closeM">Cerrar</button><button class="b g" id="xls">📥 Descargar presupuesto en Excel</button></div>`,'900px');
+ const tb=m.querySelector('#bt');
+ const row=(it)=>{const tr=document.createElement('tr');tr.innerHTML=`<td><input class="d" value="${esc(it.desc)}" placeholder="Descripción"></td><td><input class="q" type="number" min="0" step="any" value="${it.qty}"></td><td><input class="u" type="number" min="0" step="any" value="${it.unitPrice}"></td><td class="r t"></td><td><button class="ib" type="button" title="Quitar">✕</button></td>`;
+  tr.querySelector('button').onclick=()=>{tr.remove();calc()};tb.append(tr)};
+ function calc(){B.items=[...tb.rows].map(r=>({desc:r.querySelector('.d').value,qty:num(r.querySelector('.q').value),unitPrice:num(r.querySelector('.u').value)}));
+  [...tb.rows].forEach((r,i)=>r.querySelector('.t').textContent=fmt(cents(B.items[i].qty,B.items[i].unitPrice)));
+  const dc=cents(B.designHours,B.designRate);m.querySelector('#dT').textContent=fmt(dc);m.querySelector('#gT').textContent=fmt(totalC(B));save()}
+ B.items.forEach(row);calc();
+ m.addEventListener('input',e=>{const t=e.target;
+  if(t.dataset.b){B[t.dataset.b]=['designHours','designRate'].includes(t.dataset.b)?num(t.value):t.value}else if(t.dataset.s)B.style[t.dataset.s]=t.value;calc()});
+ m.querySelector('#addI').onclick=()=>{row({desc:'',qty:1,unitPrice:0});calc();tb.lastChild.querySelector('.d').focus()};
+ const sel=()=>S.templates.find(t=>t.id===m.querySelector('#tp').value);
+ m.querySelector('#tpApply').onclick=()=>{const t=sel();if(!t)return toast('Elegí una plantilla.','err');if(!confirm(`Aplicar «${t.name}»: reemplaza estilo, notas, diseño e ítems de este presupuesto (conserva cliente, número y fechas).`))return;
+  const n=structuredClone(t.data);['num','clientName','clientCuit','date','dueDate'].forEach(k=>n[k]=B[k]);c.budgetData=n;save();budgetModal(id)};
+ m.querySelector('#tpSave').onclick=()=>{const name=prompt('Nombre de la plantilla (ej: Corte láser estándar):');if(!name)return;
+  const d=structuredClone(B);S.templates.push({id:uid('t'),name,data:d});save();toast('Plantilla guardada.');budgetModal(id)};
+ m.querySelector('#tpDel').onclick=()=>{const t=sel();if(!t||!confirm(`¿Borrar la plantilla «${t.name}»?`))return;mark();S.templates=S.templates.filter(x=>x!==t);save();budgetModal(id);toast('Plantilla borrada.','',undo)};
+ m.querySelector('#xls').onclick=async e=>{e.target.disabled=true;await exportBudget(c);e.target.disabled=false};
+ m.querySelector('#fxDl').onclick=async()=>{try{dl(S.xlsx?new Blob([unb(S.xlsx.b64)]):new Blob([await(await sampleWb(B.style)).xlsx.writeBuffer()]),S.xlsx?S.xlsx.name:'Formato_presupuesto.xlsx')}catch(x){toast('No se pudo generar: '+x.message,'err')}};
+ m.querySelector('#fxUp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const it=await uploadFormat(f);budgetModal(id);toast(it?'Formato cargado: los presupuestos salen con tu estilo.':'Formato cargado, pero no tiene fila de ítems ({{item.desc}}…): los ítems no van a aparecer.',it?'':'err')}catch(x){toast('No se pudo usar el formato: '+x.message,'err')}};
+ m.querySelector('#fxDel')?.addEventListener('click',()=>{if(!confirm('¿Quitar tu formato y volver al diseño básico?'))return;mark();delete S.xlsx;save();budgetModal(id);toast('Formato quitado.','',undo)})}
+const totalC=B=>cents(B.designHours,B.designRate)+(B.items||[]).reduce((a,i)=>a+cents(i.qty,i.unitPrice),0);
+function exportXls(c){const B=c.budgetData,st=B.style,ac=esc(/^#[0-9a-f]{6}$/i.test(st.accent)?st.accent:'#0079bf'),td='style="padding:8px;border:1px solid #dfe1e6"';
+ const row=(d,q,u,t)=>`<tr><td ${td}>${esc(d)}</td><td ${td} align="center">${q}</td><td ${td} align="right">${u}</td><td ${td} align="right"><b>${t}</b></td></tr>`;
+ let rows=B.designHours>0?row(B.designDesc,B.designHours+' hs',fmt(cents(1,B.designRate)),fmt(cents(B.designHours,B.designRate))):'';
+ rows+=B.items.map(i=>row(i.desc,i.qty,fmt(cents(1,i.unitPrice)),fmt(cents(i.qty,i.unitPrice)))).join('');
+ const html=`<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>body{font-family:Segoe UI,Arial}th{background:${ac};color:#fff;padding:10px;text-align:left}</style></head><body><table>
+ <tr><td colspan="3" style="font-size:20px;font-weight:bold;color:${ac}">${esc(st.studio)}</td><td align="right"><b>PRESUPUESTO</b></td></tr>
+ <tr><td colspan="3" style="font-size:11px;color:#5e6c84">${esc(st.sub)}</td><td align="right" style="font-size:11px">Nº ${esc(B.num)}</td></tr><tr><td colspan="4"></td></tr>
+ <tr><td colspan="2" style="background:#f4f5f7;padding:8px;border:1px solid #dfe1e6"><b>Cliente</b><br>${esc(B.clientName||'N/A')}<br>CUIT: ${esc(B.clientCuit||'N/A')}<br>IVA: ${esc(B.condIva)}</td>
+ <td colspan="2" style="background:#f4f5f7;padding:8px;border:1px solid #dfe1e6"><b>Fechas</b><br>Emisión: ${esc(B.date)}<br>Vencimiento: ${esc(B.dueDate)}<br>Proyecto: <b>${esc(c.title)}</b></td></tr><tr><td colspan="4"></td></tr>
+ <tr><th>DESCRIPCIÓN / ÍTEM</th><th align="center">CANTIDAD</th><th align="right">PRECIO UNIT.</th><th align="right">TOTAL</th></tr>${rows}<tr><td colspan="4"></td></tr>
+ <tr><td colspan="3" align="right" style="padding:10px;border:1px solid #dfe1e6;font-weight:bold;color:${ac}">TOTAL GENERAL ESTIMADO:</td><td align="right" style="padding:10px;border:1px solid #dfe1e6;font-weight:bold;color:${ac}">${fmt(totalC(B))}</td></tr>
+ <tr><td colspan="4" style="font-size:11px;color:#5e6c84"><b>Notas:</b> ${esc(B.notes)}</td></tr></table></body></html>`;
+ dl(new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'}),'Presupuesto_'+(c.title||'proyecto').replace(/[^a-z0-9]+/gi,'_')+'.xls')}
+
+/* ---------- Formato Excel (.xlsx) propio ---------- */
+let XJ;
+const xl=()=>XJ||(XJ=new Promise((ok,ko)=>{if(window.ExcelJS)return ok(window.ExcelJS);const s=document.createElement('script');
+ s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';s.onload=()=>ok(window.ExcelJS);s.onerror=()=>{XJ=null;ko(new Error('no se pudo cargar el motor de Excel (¿sin internet?)'))};document.head.append(s)}));
+const MONEY=['total','total_diseno','total_items','item.unit','item.total'],TAG=/\{\{\s*([\w.]+)\s*\}\}/g;
+const ctext=v=>typeof v==='string'?v:v&&v.richText?v.richText.map(r=>r.text).join(''):'';
+const d8=s=>/^\d{4}-\d\d-\d\d$/.test(s||'')?s.split('-').reverse().join('/'):(s||'');
+/* Reemplaza {{marcas}} conservando el estilo de la celda; si la celda es solo una marca numérica, queda como número */
+function fillCell(x,M){const v=x.value,s=ctext(v);if(!s.includes('{{'))return;
+ const one=s.trim().match(/^\{\{\s*([\w.]+)\s*\}\}$/),k=one&&one[1].toLowerCase();
+ if(k&&k in M&&typeof M[k]==='number'){x.value=M[k];if(MONEY.includes(k)&&(!x.numFmt||x.numFmt==='General'))x.numFmt='"$"#,##0.00';return}
+ const rep=t=>t.replace(TAG,(a,k)=>{k=k.toLowerCase();if(!(k in M))return a;const z=M[k];return typeof z==='number'?(MONEY.includes(k)?fmt(Math.round(z*100)):z.toLocaleString('es-AR')):String(z??'')});
+ x.value=typeof v==='string'?rep(v):{richText:v.richText.map(r=>Object.assign({},r,{text:rep(r.text)}))}}
+/* Repite la fila de ítems n veces (0 = la quita) y corre las celdas combinadas, que ExcelJS no mueve solo */
+function growRows(ws,ir,n){const d=n-1,mg=ws.model.merges.map(r=>{const[a,b]=r.split(':').map(c=>ws.getCell(c));return{t:a.row,l:a.col,b:b.row,r:b.col}}).filter(m=>m.b>=ir);
+ mg.forEach(m=>ws.unMergeCells(m.t,m.l,m.b,m.r));
+ if(n===0)ws.spliceRows(ir,1);else if(n>1)ws.duplicateRow(ir,d,true);
+ mg.forEach(m=>{if(m.t>ir)ws.mergeCells(m.t+d,m.l,m.b+d,m.r);else if(m.t===ir&&m.b===ir){for(let i=0;i<n;i++)ws.mergeCells(ir+i,m.l,ir+i,m.r)}else if(m.b+d>m.t||m.r>m.l)ws.mergeCells(m.t,m.l,Math.max(m.t,m.b+d),m.r)})}
+/* Formato de ejemplo: se descarga, se edita en Excel a gusto y se vuelve a subir */
+async function sampleWb(st){const E=await xl(),wb=new E.Workbook(),ws=wb.addWorksheet('Presupuesto'),ac='FF'+(/^#[0-9a-f]{6}$/i.test(st.accent)?st.accent.slice(1):'0079bf').toUpperCase();
+ ws.columns=[{width:50},{width:12},{width:18},{width:18}];ws.views=[{showGridLines:false}];
+ const put=(a,v,s)=>{const x=ws.getCell(a);x.value=v;Object.assign(x,s||{})},bd={style:'thin',color:{argb:'FFDFE1E6'}},box={top:bd,left:bd,bottom:bd,right:bd},gray={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F5F7'}};
+ ws.mergeCells('A1:C1');put('A1','{{estudio}}',{font:{size:18,bold:true,color:{argb:ac}}});put('D1','PRESUPUESTO',{font:{size:14,bold:true},alignment:{horizontal:'right'}});
+ ws.mergeCells('A2:C2');put('A2','{{subtitulo}}',{font:{size:10,color:{argb:'FF5E6C84'}}});put('D2','Nº {{numero}}',{alignment:{horizontal:'right'}});
+ [['Cliente: {{cliente}}','Emisión: {{fecha}}'],['CUIT: {{cuit}}','Vencimiento: {{vencimiento}}'],['IVA: {{iva}}','Proyecto: {{proyecto}}']].forEach(([a,b],i)=>{const r=4+i;
+  ws.mergeCells(`C${r}:D${r}`);ws.mergeCells(`A${r}:B${r}`);put('A'+r,a,{fill:gray});put('C'+r,b,{fill:gray})});
+ ['DESCRIPCIÓN / ÍTEM','CANTIDAD','PRECIO UNIT.','TOTAL'].forEach((t,i)=>put('ABCD'[i]+8,t,{font:{bold:true,color:{argb:'FFFFFFFF'}},fill:{type:'pattern',pattern:'solid',fgColor:{argb:ac}},alignment:{horizontal:i?'right':'left'}}));
+ ['{{item.desc}}','{{item.cant}}','{{item.unit}}','{{item.total}}'].forEach((t,i)=>put('ABCD'[i]+9,t,{border:box,numFmt:i>1?'"$"#,##0.00':undefined,font:i===3?{bold:true}:undefined,alignment:i?{horizontal:'right'}:{wrapText:true}}));
+ put('C11','TOTAL GENERAL:',{font:{bold:true,color:{argb:ac}},alignment:{horizontal:'right'}});put('D11','{{total}}',{font:{bold:true,size:12,color:{argb:ac}},numFmt:'"$"#,##0.00',border:box});
+ ws.mergeCells('A13:D13');put('A13','Notas: {{notas}}',{font:{size:10,color:{argb:'FF5E6C84'}},alignment:{wrapText:true,vertical:'top'}});ws.getRow(13).height=32;
+ const h=wb.addWorksheet('Instrucciones');h.getColumn(1).width=28;h.getColumn(2).width=70;
+ [['INSTRUCCIONES','Esta hoja se borra sola al generar el presupuesto.'],['',''],['Cambiá colores, fuentes, logo, bordes y columnas como quieras en la hoja «Presupuesto».',''],['Escribí estas marcas donde quieras que vaya cada dato:',''],
+  ...[['{{estudio}} / {{subtitulo}}','Membrete'],['{{numero}}','Nº de presupuesto'],['{{cliente}} {{cuit}} {{iva}}','Datos del cliente'],['{{fecha}} / {{vencimiento}}','Fechas'],['{{proyecto}}','Nombre del proyecto'],['{{total}}','Total general (número)'],['{{total_diseno}} / {{total_items}}','Subtotales'],['{{notas}}','Notas al pie'],
+  ['{{item.desc}} {{item.cant}} {{item.unit}} {{item.total}}','Fila de ítems: se repite una vez por ítem (las horas de diseño van como primer ítem)']]].forEach(r=>h.addRow(r));
+ h.getCell('A1').font={bold:true,size:14};return wb}
+async function buildXlsx(c){const B=c.budgetData,st=B.style,E=await xl();let wb;
+ if(S.xlsx){wb=new E.Workbook();await wb.xlsx.load(unb(S.xlsx.b64))}else wb=await sampleWb(st);
+ const dc=cents(B.designHours,B.designRate),its=[...(B.designHours>0?[{desc:B.designDesc,qty:B.designHours,unitPrice:B.designRate}]:[]),...(B.items||[])];
+ const M={estudio:st.studio,subtitulo:st.sub,numero:B.num,cliente:B.clientName,cuit:B.clientCuit,iva:B.condIva,fecha:d8(B.date),vencimiento:d8(B.dueDate),proyecto:c.title,notas:B.notes,
+  total:totalC(B)/100,total_diseno:dc/100,total_items:(totalC(B)-dc)/100};
+ wb.worksheets.filter(w=>/^instrucciones$/i.test(w.name)).forEach(w=>wb.removeWorksheet(w.id));
+ wb.worksheets.forEach(ws=>{let ir=0;ws.eachRow((r,n)=>{if(!ir)r.eachCell(x=>{if(/\{\{\s*item\./i.test(ctext(x.value)))ir=n})});
+  if(ir){growRows(ws,ir,its.length);its.forEach((i,k)=>{const IM=Object.assign({},M,{'item.desc':i.desc,'item.cant':i.qty,'item.unit':cents(1,i.unitPrice)/100,'item.total':cents(i.qty,i.unitPrice)/100});
+   ws.getRow(ir+k).eachCell(x=>fillCell(x,IM))})}
+  ws.eachRow(r=>r.eachCell(x=>fillCell(x,M)))});
+ return new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+async function exportBudget(c){const n='Presupuesto_'+(c.title||'proyecto').replace(/[^a-z0-9]+/gi,'_');
+ try{dl(await buildXlsx(c),n+'.xlsx')}catch(x){toast('No se pudo usar el formato Excel ('+x.message+'). Se descargó la planilla básica.','err');exportXls(c)}}
+async function uploadFormat(f){const buf=new Uint8Array(await f.arrayBuffer()),E=await xl(),wb=new E.Workbook();
+ try{await wb.xlsx.load(buf)}catch{throw new Error('el archivo no es un Excel .xlsx válido (si es .xls viejo, guardalo como .xlsx)')}
+ let tags=0,items=0;wb.worksheets.forEach(ws=>ws.eachRow(r=>r.eachCell(x=>{const s=ctext(x.value);if(s.includes('{{'))tags++;if(/\{\{\s*item\./i.test(s))items++})));
+ if(!tags)throw new Error('el formato no tiene ninguna marca como {{cliente}} o {{total}}. Descargá el formato de ejemplo para ver cómo se usan.');
+ if(buf.length>1.5e6)throw new Error('el archivo pesa más de 1,5 MB; achicá el logo o las imágenes');
+ S.xlsx={name:f.name,b64:b64(buf)};save();return items}
+/* ---------- Organigrama con zoom y paneo ---------- */
+const V={x:30,y:30,k:1},vp=()=>$('#vp');
+const applyV=()=>{$('#world').style.transform=`translate(${V.x}px,${V.y}px) scale(${V.k})`};
+function org(){const w=$('#world');allCards().forEach(({k,col})=>{const n=document.createElement('div');n.className='nd'+(custom(k)?' cc':'');n.dataset.id=k.id;
+ n.style.cssText=`left:${k.x}px;top:${k.y}px;${custom(k)?'background:'+k.color:''}`;
+ n.innerHTML=`<h4>📁 ${esc(k.title)}</h4><small>${esc(col.title)}</small><div><button data-act="open" data-id="${k.id}">📂 Abrir</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button></div>`;w.append(n)});applyV();lines()}
+function lines(){const svg=$('#svg');if(!svg)return;svg.querySelectorAll('line').forEach(l=>l.remove());
+ S.connections.forEach((cn,i)=>{const a=$(`.nd[data-id="${cn.from}"]`),b=$(`.nd[data-id="${cn.to}"]`);if(!a||!b)return;
+  const c=n=>({x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2,w:n.offsetWidth/2,h:n.offsetHeight/2}),p=c(a),q=c(b),dx=q.x-p.x,dy=q.y-p.y;
+  const edge=(o,sx,sy)=>{const t=Math.min(sx?o.w/Math.abs(sx):1e9,sy?o.h/Math.abs(sy):1e9);return[o.x+sx*t,o.y+sy*t]};
+  const[x1,y1]=edge(p,dx,dy),[x2,y2]=edge(q,-dx,-dy),l=document.createElementNS('http://www.w3.org/2000/svg','line');
+  for(const[k,v]of Object.entries({x1,y1,x2,y2,'marker-end':'url(#ar)'}))l.setAttribute(k,v);
+  l.onclick=()=>{mark();S.connections.splice(i,1);save();lines();toast('Conexión eliminada.','',()=>{undo()})};svg.append(l)})}
+function zoomAt(f,mx,my){const k=Math.min(2.5,Math.max(.2,V.k*f)),r=k/V.k;V.x=mx-(mx-V.x)*r;V.y=my-(my-V.y)*r;V.k=k;applyV()}
+function fitView(){const ns=[...document.querySelectorAll('.nd')];if(!ns.length)return;
+ const x0=Math.min(...ns.map(n=>n.offsetLeft)),y0=Math.min(...ns.map(n=>n.offsetTop)),x1=Math.max(...ns.map(n=>n.offsetLeft+n.offsetWidth)),y1=Math.max(...ns.map(n=>n.offsetTop+n.offsetHeight)),v=vp();
+ V.k=Math.min(1.2,(v.clientWidth-60)/(x1-x0),(v.clientHeight-60)/(y1-y0));V.x=30-x0*V.k+(v.clientWidth-60-(x1-x0)*V.k)/2;V.y=30-y0*V.k+(v.clientHeight-60-(y1-y0)*V.k)/2;applyV()}
+document.addEventListener('wheel',e=>{const v=e.target.closest?.('#vp');if(!v)return;e.preventDefault();const r=v.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+let drag=null;
+document.addEventListener('pointerdown',e=>{const v=e.target.closest?.('#vp');if(!v||e.target.closest('button,line'))return;
+ const n=e.target.closest('.nd');drag={n,sx:e.clientX,sy:e.clientY,ox:n?S_card(n).x:V.x,oy:n?S_card(n).y:V.y};v.setPointerCapture(e.pointerId);if(!n)v.classList.add('pan')});
+const S_card=n=>locate(n.dataset.id).c;
+document.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+ if(drag.n){const c=S_card(drag.n);c.x=Math.max(0,Math.round(drag.ox+dx/V.k));c.y=Math.max(0,Math.round(drag.oy+dy/V.k));drag.n.style.left=c.x+'px';drag.n.style.top=c.y+'px';lines()}
+ else{V.x=drag.ox+dx;V.y=drag.oy+dy;applyV()}});
+document.addEventListener('pointerup',()=>{if(drag){if(drag.n)save();vp()?.classList.remove('pan');drag=null}});
+</script>
+</body>
+</html>
