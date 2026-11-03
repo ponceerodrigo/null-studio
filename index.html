@@ -284,9 +284,11 @@ function getProjectCardCosts(k){
 }
 function profitHTML(k){
  const P=k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});P.costs=Array.isArray(P.costs)?P.costs:[];
+ const bTot=k.budgetData?totalC(k.budgetData)/100:0;
+ if(bTot>0&&(!P.approved||P.approved===500000||!P.manualApproved)){P.approved=bTot}
  const cardItems=getProjectCardCosts(k);
  return `<aside class="pbox" id="pbox"><h3><span>💰 Presupuesto aprobado por cliente</span></h3>
-  <div class="f" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><label style="margin:0">Monto que pagará el cliente ($)</label><button class="ib" data-act="syncBud" title="Traer el total del presupuesto 📊" style="font-size:11px;color:var(--ac)">📊 Traer de presupuesto</button></div>
+  <div class="f" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><label style="margin:0">Monto que pagará el cliente ($)</label><button class="ib" data-act="syncBud" title="Sincronizar con el total del presupuesto 📊" style="font-size:11px;color:var(--ac)">📊 Traer de presupuesto</button></div>
    <div class="papp"><span>$</span><input id="pApp" type="number" min="0" step="any" placeholder="0.00" value="${P.approved||''}"></div></div>
   <div class="psum">
    <div class="psum-row"><span>Presupuesto aprobado:</span><b id="psA">$0,00</b></div>
@@ -345,7 +347,7 @@ const A={
  edit(a){editCard(a.dataset.id)},budget(a){budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
  addCost(){if(!F)return;const P=locate(F).c.profitData;P.costs.push({id:uid('c'),desc:'',amount:0});save();render();const r=document.querySelectorAll('#pCosts .pcd');r[r.length-1]?.focus()},
  delCost(a){if(!F)return;const P=locate(F).c.profitData;P.costs.splice(+a.dataset.ci,1);save();render()},
- syncBud(){if(!F)return;const c=locate(F).c,tot=totalC(c.budgetData)/100;if(!tot)return toast('El presupuesto 📊 todavía está en $0.','err');c.profitData.approved=tot;save();render();toast('Monto traído del presupuesto.')},
+ syncBud(){if(!F)return;const c=locate(F).c,tot=totalC(c.budgetData)/100;if(!tot)return toast('El presupuesto 📊 todavía está en $0.','err');c.profitData.approved=tot;delete c.profitData.manualApproved;save();render();toast('Monto sincronizado con el presupuesto.')},
  export(){flush().then(()=>{const b=new Blob([LS.getItem(VK)],{type:'application/json'});dl(b,'null_studio_respaldo_'+new Date().toISOString().slice(0,10)+'.json');toast('Respaldo cifrado descargado. Se abre con tu clave.')})},
  restore(){const p=LS.getItem(PK);if(!p)return toast('Todavía no hay copia previa.','err');
   if(!confirm('Se reemplazan los datos actuales por la copia previa (guardada antes de tu último borrado o importación). ¿Continuar?'))return;
@@ -356,7 +358,7 @@ const A={
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
  const c=e.target.closest('.cd');if(c&&!F)A.open({dataset:{id:c.dataset.id}});else if(c&&F)editCard(c.dataset.id)});
 document.addEventListener('input',e=>{if(!F||!e.target.closest?.('#pbox'))return;const P=locate(F).c.profitData,t=e.target;
- if(t.id==='pApp')P.approved=num(t.value);
+ if(t.id==='pApp'){P.approved=num(t.value);P.manualApproved=true;}
  else if(t.dataset.ck){const r=t.closest('.pcrow');if(r)P.costs[+r.dataset.ci][t.dataset.ck]=t.dataset.ck==='amount'?num(t.value):t.value}
  calcProfit();save()});
 document.addEventListener('change',e=>{if(e.target.dataset.ren){const l=cur().find(x=>x.id===e.target.dataset.ren);l.title=e.target.value||'Lista';save()}});
@@ -378,9 +380,9 @@ $('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)r
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 
 /* ---------- Modales ---------- */
-function modal(html,w){closeM();const m=document.createElement('div');m.className='md';m.innerHTML=`<div class="mb" style="${w?'width:'+w:''}" role="dialog" aria-modal="true">${html}</div>`;
+function modal(html,w){closeM(true);const m=document.createElement('div');m.className='md';m.innerHTML=`<div class="mb" style="${w?'width:'+w:''}" role="dialog" aria-modal="true">${html}</div>`;
  m.addEventListener('mousedown',e=>{if(e.target===m)closeM()});document.body.append(m);return m.firstChild}
-function closeM(){document.querySelectorAll('.md').forEach(m=>m.remove())}
+function closeM(skipRender){document.querySelectorAll('.md').forEach(m=>m.remove());if(!skipRender&&F)render()}
 addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
 function editCard(id){const r=locate(id);if(!r)return;const c=r.c;
  const fld=(l,v)=>`<div class="box fl"><input class="fk" placeholder="Título del campo" value="${esc(l)}"><textarea class="fv" rows="2" placeholder="Detalle…">${esc(v)}</textarea><button class="b d" type="button" onclick="this.parentNode.remove()">Quitar campo</button></div>`;
@@ -420,7 +422,9 @@ function budgetModal(id){const c=locate(id).c;const B=c.budgetData=Object.assign
   tr.querySelector('button').onclick=()=>{tr.remove();calc()};tb.append(tr)};
  function calc(){B.items=[...tb.rows].map(r=>({desc:r.querySelector('.d').value,qty:num(r.querySelector('.q').value),unitPrice:num(r.querySelector('.u').value)}));
   [...tb.rows].forEach((r,i)=>r.querySelector('.t').textContent=fmt(cents(B.items[i].qty,B.items[i].unitPrice)));
-  const dc=cents(B.designHours,B.designRate);m.querySelector('#dT').textContent=fmt(dc);m.querySelector('#gT').textContent=fmt(totalC(B));save()}
+  const dc=cents(B.designHours,B.designRate);m.querySelector('#dT').textContent=fmt(dc);const tot=totalC(B);m.querySelector('#gT').textContent=fmt(tot);
+  c.profitData.approved=tot/100;delete c.profitData.manualApproved;save();
+  if(F===id&&$('#pbox')){$('#pApp').value=c.profitData.approved||'';calcProfit()}}
  B.items.forEach(row);calc();
  m.addEventListener('input',e=>{const t=e.target;
   if(t.dataset.b){B[t.dataset.b]=['designHours','designRate'].includes(t.dataset.b)?num(t.value):t.value}else if(t.dataset.s)B.style[t.dataset.s]=t.value;calc()});
