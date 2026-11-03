@@ -205,7 +205,8 @@ function normalize(d){
  d.columns.forEach(c=>(c.cards=c.cards||[]).forEach(k=>{
   if(k.x===undefined||k.y===undefined){k.x=x;k.y=y;x+=260;if(x>900){x=50;y+=180}}
   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
-  k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];}));
+  k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
+  k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';}));
  return d}
 function nextNum(d){let m=1442;(d||S).columns.forEach(c=>c.cards.forEach(k=>{const n=parseInt(k.budgetData&&k.budgetData.num);if(n>m)m=n}));return String(m+1)}
 function bdef(d){return{num:nextNum(d),clientName:'',clientCuit:'',condIva:'Consumidor Final',date:new Date().toISOString().slice(0,10),dueDate:'',
@@ -257,6 +258,19 @@ function applyTheme(){const th=LS.getItem('nl_theme')||'auto';
  const b=$('#bth');if(b)b.textContent={auto:'🌗 Auto',light:'☀️ Claro',dark:'🌙 Oscuro'}[th]}
 applyTheme();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyTheme);
 
+/* ---------- Proveedores & Utilidades ---------- */
+const isSuppCol=l=>!!(l&&l.title&&l.title.toLowerCase().includes('proveedor'));
+const isSupplierCard=(c,l)=>!!(c&&(c.isSupplier||(l&&isSuppCol(l))));
+function getGlobalSuppliers(){
+ const list=[];
+ (S.columns||[]).forEach(col=>{
+  (col.cards||[]).forEach(c=>{
+   if(c.isSupplier||isSuppCol(col))list.push(c);
+  });
+ });
+ return list;
+}
+
 /* ---------- Render ---------- */
 function render(){
  $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(locate(F).c.title)}</span><button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`
@@ -264,8 +278,15 @@ function render(){
  const m=$('#main');
  if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
   <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
- m.innerHTML=`<div class="board">${cur().map(l=>`<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
-  <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div><button class="add" data-act="addCard" data-l="${l.id}">+ Añadir tarjeta</button></section>`).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
+ m.innerHTML=`<div class="board">${cur().map(l=>{
+  const isSup=isSuppCol(l);
+  return `<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
+  <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div>
+  <div style="display:flex;gap:4px">
+   <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isSup&&!F?'Añadir proveedor':'Añadir tarjeta'}</button>
+   ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button>`:''}
+  </div></section>`;
+ }).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
  if(F){m.innerHTML=`<div class="pview">${m.innerHTML}${profitHTML(locate(F).c)}</div>`;calcProfit()}}
 function getProjectCardCosts(k){
  const items=[];
@@ -323,13 +344,24 @@ function calcProfit(){
  const pEl=$('#psP');pEl.textContent=(ac>0||cc>0?pct.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'0%');pEl.style.color=col;
  const bEl=$('#psB');bEl.style.width=Math.max(0,Math.min(100,ac>0?(nc/ac)*100:0))+'%';bEl.style.background=col}
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
-function cardHTML(c){const p=c.profitData,ac=p?cents(1,p.approved):0;
+function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l);
+ const p=c.profitData,ac=p?cents(1,p.approved):0;
  const cardCost=getProjectCardCosts(c).reduce((a,x)=>a+x.cost,0);
  const extraCost=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0;
  const cc=cardCost+extraCost,pct=ac>0?Math.round(((ac-cc)/ac)*100):0;
- const meta=F?(c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'')):
-  [(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0)),ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')].filter(Boolean).join(' · ');
- return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${F?'':'📁 '}${esc(c.title)}</span><span>${F?'':`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
+ let meta='';
+ if(!F&&isSupp){
+  meta=[c.specialty?`🏷️ <b>${esc(c.specialty)}</b>`:'',c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:'',c.notes?`📝 ${esc(c.notes.slice(0,30))}${c.notes.length>30?'…':''}`:''].filter(Boolean).join(' · ');
+ }else if(F){
+  const cost=c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'');
+  const inf=[c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:''].filter(Boolean).join(' · ');
+  meta=[cost,inf].filter(Boolean).join(' · ');
+ }else{
+  meta=[(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0)),ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')].filter(Boolean).join(' · ');
+ }
+ const icon=(!F&&isSupp)?'🏭 ':(F?(isSupp?'🏭 ':''):'📁 ');
+ const acts=(!F&&!isSupp)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
+ return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)}</span><span>${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
 const A={
@@ -340,8 +372,35 @@ const A={
  delList(a){const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
   mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
  addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
-  const k={id,title:F?'Nuevo ítem':'Nuevo proyecto',color:'#ffffff',qty:1,unitPrice:0,fields:[],folderColumns:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
+  const isSupp=isSuppCol(l);
+  const k={id,title:isSupp?'Nuevo proveedor':(F?'Nuevo ítem':'Nuevo proyecto'),isSupplier:isSupp,phone:'',location:'',notes:'',specialty:'',color:'#ffffff',qty:1,unitPrice:0,fields:[],
+   folderColumns:(isSupp&&!F)?[]:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
    x:50+(allCards().length%4)*260,y:50+Math.floor(allCards().length/4)*180};k.budgetData=bdef();k.profitData={approved:0,costs:[]};l.cards.push(k);save();render();A.edit({dataset:{id}})},
+ callSupplier(a){
+  const lid=a.dataset.l,sups=getGlobalSuppliers();
+  if(!sups.length)return toast('No hay proveedores en la lista "Proveedores" del tablero principal. Creá uno allí primero.','err');
+  const m=modal(`<h3>🏭 Llamar Proveedor al Proyecto</h3>
+  <p class="hint" style="margin-bottom:12px">Elegí un proveedor guardado para agregarlo a esta lista con sus datos de contacto:</p>
+  <div style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;margin-bottom:14px">
+   ${sups.map(s=>`
+    <div style="background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+     <div style="min-width:0;flex:1">
+      <div style="font-weight:700">${esc(s.title)} ${s.specialty?`<span class="n" style="font-size:11px;background:var(--pn);padding:2px 6px;border-radius:4px;border:1px solid var(--ln);margin-left:4px">${esc(s.specialty)}</span>`:''}</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:3px">${[s.phone?'📞 '+esc(s.phone):'',s.location?'📍 '+esc(s.location):''].filter(Boolean).join(' · ')}</div>
+      ${s.notes?`<div style="font-size:11px;color:var(--mu);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${esc(s.notes)}</div>`:''}
+     </div>
+     <button class="b p" data-act="pickSup" data-sid="${s.id}" data-lid="${lid}">+ Agregar</button>
+    </div>`).join('')}
+  </div>
+  <div class="acts"><button class="b" data-act="closeM">Cerrar</button></div>`,'540px');
+ },
+ pickSup(a){
+  const s=getGlobalSuppliers().find(x=>x.id===a.dataset.sid),l=cur().find(x=>x.id===a.dataset.lid);
+  if(!s||!l)return;
+  const id=uid('k');
+  const k={id,title:s.title,specialty:s.specialty||'',phone:s.phone||'',location:s.location||'',notes:s.notes||'',supplierId:s.id,isSupplier:true,qty:1,unitPrice:0,color:s.color||'#ffffff',fields:[],folderColumns:[]};
+  l.cards.push(k);save();closeM();render();editCard(id);toast(`Proveedor «${s.title}» agregado al proyecto.`);
+ },
  delCard(a){mark();const r=locate(a.dataset.id);r.list.cards.splice(r.list.cards.indexOf(r.c),1);S.connections=S.connections.filter(c=>c.from!==r.c.id&&c.to!==r.c.id);save();render();toast(`"${r.c.title}" eliminada.`,'',undo)},
  open(a){F=a.dataset.id;VIEW='board';render()},
  edit(a){editCard(a.dataset.id)},budget(a){budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
@@ -356,7 +415,11 @@ const A={
  closeM(){closeM()}
 };
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
- const c=e.target.closest('.cd');if(c&&!F)A.open({dataset:{id:c.dataset.id}});else if(c&&F)editCard(c.dataset.id)});
+ const c=e.target.closest('.cd');if(c){
+  const r=locate(c.dataset.id);
+  if(!F&&r&&!isSupplierCard(r.c,r.list)){A.open({dataset:{id:c.dataset.id}})}
+  else{editCard(c.dataset.id)}
+ }});
 document.addEventListener('input',e=>{if(!F||!e.target.closest?.('#pbox'))return;const P=locate(F).c.profitData,t=e.target;
  if(t.id==='pApp'){P.approved=num(t.value);P.manualApproved=true;}
  else if(t.dataset.ck){const r=t.closest('.pcrow');if(r)P.costs[+r.dataset.ci][t.dataset.ck]=t.dataset.ck==='amount'?num(t.value):t.value}
@@ -384,18 +447,69 @@ function modal(html,w){closeM(true);const m=document.createElement('div');m.clas
  m.addEventListener('mousedown',e=>{if(e.target===m)closeM()});document.body.append(m);return m.firstChild}
 function closeM(skipRender){document.querySelectorAll('.md').forEach(m=>m.remove());if(!skipRender&&F)render()}
 addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
-function editCard(id){const r=locate(id);if(!r)return;const c=r.c;
+function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
+ const isSupp=isSupplierCard(c,l);
+ const isGlobalSupp=!F&&isSupp;
  const fld=(l,v)=>`<div class="box fl"><input class="fk" placeholder="Título del campo" value="${esc(l)}"><textarea class="fv" rows="2" placeholder="Detalle…">${esc(v)}</textarea><button class="b d" type="button" onclick="this.parentNode.remove()">Quitar campo</button></div>`;
- const m=modal(`<h3>Propiedades</h3><div class="f"><label>Nombre</label><input id="e1" value="${esc(c.title)}"></div>
- <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div><div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>
- <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div></div>
- ${r.parent?'':`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`}
- <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
- <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`,'560px');
+ let body='';
+ if(isGlobalSupp){
+  body=`<h3>🏢 Ficha de Proveedor</h3>
+  <div class="f"><label>Nombre del proveedor / Razón social</label><input id="e1" value="${esc(c.title)}"></div>
+  <div class="row">
+   <div class="f"><label>Rubro / Especialidad</label><input id="esup_spec" placeholder="Ej: Corte láser, Tornería, Pintura..." value="${esc(c.specialty||'')}"></div>
+   <div class="f"><label>Teléfono / Contacto / WhatsApp</label><input id="esup_phone" placeholder="Ej: +54 9 351 1234567" value="${esc(c.phone||'')}"></div>
+  </div>
+  <div class="f"><label>Ubicación / Dirección</label><input id="esup_loc" placeholder="Ej: Av. Colón 1234, Córdoba" value="${esc(c.location||'')}"></div>
+  <div class="f"><label>Anotaciones extras / Horarios / Contacto</label><textarea id="esup_notes" rows="3" placeholder="Horarios de atención, persona de contacto, condiciones comerciales, formas de pago...">${esc(c.notes||'')}</textarea></div>
+  <div class="row" style="align-items:center">
+   <div class="f"><label>Color de tarjeta</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div>
+   ${c.phone?`<a href="https://wa.me/${c.phone.replace(/[^0-9]/g,'')}" target="_blank" class="b" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:14px;color:var(--ok)">📲 WhatsApp</a>`:''}
+   ${c.location?`<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.location)}" target="_blank" class="b" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:14px">📍 Mapa</a>`:''}
+  </div>
+  <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo extra</button>
+  <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar Proveedor</button></div>`;
+ }else{
+  const sups=getGlobalSuppliers();
+  const supOpts=sups.map(s=>`<option value="${s.id}" ${c.supplierId===s.id?'selected':''}>${esc(s.title)}${s.specialty?' ('+esc(s.specialty)+')':''}</option>`).join('');
+  body=`<h3>${F?(isSupp?'🏭 Proveedor en proyecto':'Propiedades de ítem'):'Propiedades de proyecto'}</h3>
+  ${F&&sups.length?`<div class="box row" style="align-items:end;background:var(--cd)">
+   <div class="f" style="margin:0;flex:2"><label>🏭 Proveedor guardado:</label><select id="selSup"><option value="">— Cargar datos de proveedor guardado —</option>${supOpts}</select></div>
+   <button class="b" type="button" id="btnApplySup">Copiar datos</button>
+  </div>`:''}
+  <div class="f"><label>Nombre</label><input id="e1" value="${esc(c.title)}"></div>
+  <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div><div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>
+  <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div></div>
+  ${F?`<div class="row"><div class="f"><label>Teléfono / Contacto</label><input id="esup_phone" placeholder="Opcional" value="${esc(c.phone||'')}"></div><div class="f"><label>Ubicación</label><input id="esup_loc" placeholder="Opcional" value="${esc(c.location||'')}"></div></div>
+  <div class="f"><label>Anotaciones extras</label><textarea id="esup_notes" rows="2" placeholder="Notas sobre el trabajo, entrega, etc.">${esc(c.notes||'')}</textarea></div>`:''}
+  ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`:''}
+  <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
+  <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`;
+ }
+ const m=modal(body,isGlobalSupp?'580px':'560px');
+ m.querySelector('#btnApplySup')?.addEventListener('click',()=>{
+  const sid=m.querySelector('#selSup').value;
+  const s=getGlobalSuppliers().find(x=>x.id===sid);
+  if(!s)return;
+  m.querySelector('#e1').value=s.title;
+  if(m.querySelector('#esup_phone'))m.querySelector('#esup_phone').value=s.phone||'';
+  if(m.querySelector('#esup_loc'))m.querySelector('#esup_loc').value=s.location||'';
+  if(m.querySelector('#esup_notes'))m.querySelector('#esup_notes').value=s.notes||'';
+  c.supplierId=s.id;c.isSupplier=true;
+ });
  m.querySelector('#ebud')?.addEventListener('click',()=>{m.querySelector('#ok').click();budgetModal(id)});
  m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
- m.querySelector('#ok').onclick=()=>{c.title=m.querySelector('#e1').value.trim()||'Sin título';c.qty=num(m.querySelector('#e2').value);c.unitPrice=num(m.querySelector('#e3').value);c.color=m.querySelector('#e4').value;
-  c.fields=[...m.querySelectorAll('.fl')].map(b=>({label:b.querySelector('.fk').value,value:b.querySelector('.fv').value})).filter(f=>f.label||f.value);save();closeM();render()};
+ m.querySelector('#ok').onclick=()=>{
+  c.title=m.querySelector('#e1').value.trim()||'Sin título';
+  if(m.querySelector('#esup_spec'))c.specialty=m.querySelector('#esup_spec').value.trim();
+  if(m.querySelector('#esup_phone'))c.phone=m.querySelector('#esup_phone').value.trim();
+  if(m.querySelector('#esup_loc'))c.location=m.querySelector('#esup_loc').value.trim();
+  if(m.querySelector('#esup_notes'))c.notes=m.querySelector('#esup_notes').value.trim();
+  if(m.querySelector('#e2'))c.qty=num(m.querySelector('#e2').value);
+  if(m.querySelector('#e3'))c.unitPrice=num(m.querySelector('#e3').value);
+  c.color=m.querySelector('#e4').value;
+  c.fields=[...m.querySelectorAll('.fl')].map(b=>({label:b.querySelector('.fk').value,value:b.querySelector('.fv').value})).filter(f=>f.label||f.value);
+  save();closeM();render();
+ };
  m.querySelector('#e1').select()}
 function linkModal(id){const me=locate(id).c,opts=allCards().filter(x=>x.k.id!==id).map(x=>`<option value="${x.k.id}">${esc(x.k.title)} (${esc(x.col.title)})</option>`).join('');
  if(!opts)return toast('Necesitás al menos dos proyectos para conectar.','err');
