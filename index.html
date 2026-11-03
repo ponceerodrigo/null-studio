@@ -267,33 +267,66 @@ function render(){
  m.innerHTML=`<div class="board">${cur().map(l=>`<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
   <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div><button class="add" data-act="addCard" data-l="${l.id}">+ Añadir tarjeta</button></section>`).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
  if(F){m.innerHTML=`<div class="pview">${m.innerHTML}${profitHTML(locate(F).c)}</div>`;calcProfit()}}
+function getProjectCardCosts(k){
+ const items=[];
+ if(!k||!Array.isArray(k.folderColumns))return items;
+ for(const col of k.folderColumns){
+  for(const c of (col.cards||[])){
+   const q=(c.qty!==undefined&&c.qty!==null&&c.qty!=='')?num(c.qty):1;
+   const u=num(c.unitPrice);
+   const cost=cents(q,u);
+   if(cost>0){
+    items.push({card:c,colTitle:col.title||'Lista',cost,qty:q,unitPrice:u});
+   }
+  }
+ }
+ return items;
+}
 function profitHTML(k){
  const P=k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});P.costs=Array.isArray(P.costs)?P.costs:[];
+ const cardItems=getProjectCardCosts(k);
  return `<aside class="pbox" id="pbox"><h3><span>💰 Presupuesto aprobado por cliente</span></h3>
   <div class="f" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><label style="margin:0">Monto que pagará el cliente ($)</label><button class="ib" data-act="syncBud" title="Traer el total del presupuesto 📊" style="font-size:11px;color:var(--ac)">📊 Traer de presupuesto</button></div>
    <div class="papp"><span>$</span><input id="pApp" type="number" min="0" step="any" placeholder="0.00" value="${P.approved||''}"></div></div>
   <div class="psum">
    <div class="psum-row"><span>Presupuesto aprobado:</span><b id="psA">$0,00</b></div>
-   <div class="psum-row"><span>Total costos del proyecto:</span><b id="psC" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row"><span>Costos en tarjetas (tablero):</span><b id="psCardCost" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row"><span>Otros costos / gastos:</span><b id="psExtraCost" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row" style="border-top:1px dashed var(--ln);padding-top:4px"><span>Total costos del proyecto:</span><b id="psC" style="color:var(--dg)">-$0,00</b></div>
    <div class="psum-net"><span>Ganancia neta (queda):</span><span id="psN">$0,00</span></div>
    <div class="psum-row" style="margin-top:2px"><span>Porcentaje que queda (margen):</span><b id="psP" style="font-size:15px">0%</b></div>
    <div class="pbar"><div id="psB" style="width:0%"></div></div>
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><label class="lb" style="margin:0">Costos del proyecto (<span id="psCnt">${P.costs.length}</span>)</label></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><label class="lb" style="margin:0">Costos de tarjetas (<span id="psCardCnt">${cardItems.length}</span>)</label></div>
+  <div class="pcosts" id="pCardList" style="max-height:160px;overflow-y:auto">${cardItems.length?cardItems.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:6px 9px;font-size:12px;gap:6px">
+   <div style="min-width:0;flex:1"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(x.card.title)}">${esc(x.card.title)}</div><div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.colTitle)} · ${x.qty} × ${fmt(cents(1,x.unitPrice))}</div></div>
+   <b style="color:var(--dg);white-space:nowrap">${fmt(x.cost)}</b><button class="ib" data-act="edit" data-id="${x.card.id}" title="Editar tarjeta">⚙️</button></div>`).join(''):'<div class="hint" style="margin:0;font-size:12px">No hay tarjetas con costo aún. Asigná "Costo unitario" en las propiedades de una tarjeta.</div>'}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><label class="lb" style="margin:0">Otros costos / gastos (<span id="psCnt">${P.costs.length}</span>)</label></div>
   <div class="pcosts" id="pCosts">${P.costs.map((x,i)=>`<div class="pcrow" data-ci="${i}"><input class="pcd" data-ck="desc" placeholder="Ítem de costo / gasto…" value="${esc(x.desc)}"><input class="pca" data-ck="amount" type="number" min="0" step="any" placeholder="$ Monto" value="${x.amount||''}"><button class="ib" data-act="delCost" data-ci="${i}" title="Quitar costo">✕</button></div>`).join('')}</div>
   <button class="b" data-act="addCost" style="width:100%">+ Agregar ítem de costo</button></aside>`}
 function calcProfit(){
  if(!F||!$('#pbox'))return;
- const P=locate(F).c.profitData,ac=cents(1,P.approved),cc=P.costs.reduce((a,x)=>a+cents(1,x.amount),0),nc=ac-cc;
+ const proj=locate(F).c;
+ const P=proj.profitData,ac=cents(1,P.approved);
+ const cardItems=getProjectCardCosts(proj);
+ const cardCost=cardItems.reduce((a,x)=>a+x.cost,0);
+ const extraCost=P.costs.reduce((a,x)=>a+cents(1,x.amount),0);
+ const cc=cardCost+extraCost,nc=ac-cc;
  const pct=ac>0?(nc/ac)*100:(cc>0?-100:0),col=nc<0?'var(--dg)':(pct<20&&ac>0?'#d97706':'var(--ok)');
- $('#psA').textContent=fmt(ac);$('#psC').textContent=(cc>0?'-':'')+fmt(cc);
+ $('#psA').textContent=fmt(ac);
+ const cEl=$('#psCardCost');if(cEl)cEl.textContent=(cardCost>0?'-':'')+fmt(cardCost);
+ const eEl=$('#psExtraCost');if(eEl)eEl.textContent=(extraCost>0?'-':'')+fmt(extraCost);
+ $('#psC').textContent=(cc>0?'-':'')+fmt(cc);
  const nEl=$('#psN');nEl.textContent=(nc<0?'-':'')+fmt(Math.abs(nc));nEl.style.color=col;
  const pEl=$('#psP');pEl.textContent=(ac>0||cc>0?pct.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'0%');pEl.style.color=col;
  const bEl=$('#psB');bEl.style.width=Math.max(0,Math.min(100,ac>0?(nc/ac)*100:0))+'%';bEl.style.background=col}
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
-function cardHTML(c){const p=c.profitData,ac=p?cents(1,p.approved):0,cc=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0,pct=ac>0?Math.round(((ac-cc)/ac)*100):0;
+function cardHTML(c){const p=c.profitData,ac=p?cents(1,p.approved):0;
+ const cardCost=getProjectCardCosts(c).reduce((a,x)=>a+x.cost,0);
+ const extraCost=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0;
+ const cc=cardCost+extraCost,pct=ac>0?Math.round(((ac-cc)/ac)*100):0;
  const meta=F?(c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'')):
-  [(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0)),ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:''].filter(Boolean).join(' · ');
+  [(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0)),ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')].filter(Boolean).join(' · ');
  return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${F?'':'📁 '}${esc(c.title)}</span><span>${F?'':`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
