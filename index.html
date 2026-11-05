@@ -211,7 +211,14 @@ function normalize(d){
   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
   k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
   k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';
-  k.pinterestUrl=k.pinterestUrl||'';k.pinCollapsed=!!k.pinCollapsed;}));
+  k.pinterestUrl=k.pinterestUrl||'';k.pinCollapsed=!!k.pinCollapsed;
+  k.designerId=k.designerId||'';k.isDesigner=!!k.isDesigner;}));
+ if(!d.columns.some(isDesCol)){
+  const supIdx=d.columns.findIndex(isSuppCol);
+  const newCol={id:uid('c'),title:'Diseñadores',cards:[]};
+  if(supIdx>=0)d.columns.splice(supIdx+1,0,newCol);
+  else d.columns.push(newCol);
+ }
  return d}
 function nextNum(d){let m=1442;(d||S).columns.forEach(c=>c.cards.forEach(k=>{const n=parseInt(k.budgetData&&k.budgetData.num);if(n>m)m=n}));return String(m+1)}
 function bdef(d){return{num:nextNum(d),clientName:'',clientCuit:'',condIva:'Consumidor Final',date:new Date().toISOString().slice(0,10),dueDate:'',
@@ -263,9 +270,12 @@ function applyTheme(){const th=LS.getItem('nl_theme')||'auto';
  const b=$('#bth');if(b)b.textContent={auto:'🌗 Auto',light:'☀️ Claro',dark:'🌙 Oscuro'}[th]}
 applyTheme();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyTheme);
 
-/* ---------- Proveedores & Utilidades ---------- */
-const isSuppCol=l=>!!(l&&l.title&&l.title.toLowerCase().includes('proveedor'));
-const isSupplierCard=(c,l)=>!!(c&&(c.isSupplier||(l&&isSuppCol(l))));
+/* ---------- Proveedores, Diseñadores & Utilidades ---------- */
+function isSuppCol(l){return!!(l&&l.title&&l.title.toLowerCase().includes('proveed'))}
+function isSupplierCard(c,l){return!!(c&&(c.isSupplier||(l&&isSuppCol(l))))}
+function isDesCol(l){return!!(l&&l.title&&l.title.toLowerCase().includes('diseñ'))}
+function isDesignerCard(c,l){return!!(c&&(c.isDesigner||(l&&isDesCol(l))))}
+
 function getGlobalSuppliers(){
  const list=[];
  (S.columns||[]).forEach(col=>{
@@ -276,19 +286,62 @@ function getGlobalSuppliers(){
  return list;
 }
 
+function getGlobalDesigners(){
+ const list=[];
+ (S.columns||[]).forEach(col=>{
+  (col.cards||[]).forEach(c=>{
+   if(c.isDesigner||isDesCol(col))list.push(c);
+  });
+ });
+ return list;
+}
+
+function getGlobalProjects(){
+ const list=[];
+ if(!S||!Array.isArray(S.columns))return list;
+ S.columns.forEach(col=>{
+  if(!isSuppCol(col)&&!isDesCol(col)){
+   (col.cards||[]).forEach(c=>{
+    if(!isSupplierCard(c,col)&&!isDesignerCard(c,col))list.push({card:c,col});
+   });
+  }
+ });
+ return list;
+}
+
+function getDesignerProjects(designerId){
+ return getGlobalProjects().filter(p=>p.card.designerId===designerId);
+}
+
+function syncDesignerConnection(projId, newDesId, oldDesId){
+ if(!S||!Array.isArray(S.connections))return;
+ if(oldDesId&&oldDesId!==newDesId){
+  S.connections=S.connections.filter(cn=>!(cn.from===oldDesId&&cn.to===projId));
+ }
+ if(newDesId){
+  if(!S.connections.some(cn=>cn.from===newDesId&&cn.to===projId)){
+   S.connections.push({from:newDesId,to:projId});
+  }
+ }
+}
+
 /* ---------- Render ---------- */
 function render(){
- $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(locate(F).c.title)}</span><button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`
+ const curProj=F?locate(F).c:null;
+ const curDes=curProj&&curProj.designerId?getGlobalDesigners().find(d=>d.id===curProj.designerId):null;
+ const desBadge=curDes?`<span class="b" style="margin-left:8px;font-size:12px;padding:3px 8px;font-weight:600" title="Diseñador a cargo">👤 ${esc(curDes.title)}</span>`:'';
+ $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(curProj.title)}</span>${desBadge}<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`
   :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>`;
  const m=$('#main');
  if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
   <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
  m.innerHTML=`<div class="board">${cur().map(l=>{
   const isSup=isSuppCol(l);
+  const isDes=isDesCol(l);
   return `<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
   <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div>
   <div style="display:flex;gap:4px">
-   <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isSup&&!F?'Añadir proveedor':'Añadir tarjeta'}</button>
+   <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isDes&&!F?'Añadir diseñador':(isSup&&!F?'Añadir proveedor':'Añadir tarjeta')}</button>
    ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button>`:''}
   </div></section>`;
  }).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
@@ -407,23 +460,35 @@ function initPinterest(){
  },100);
 }
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
-function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l);
+function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l),isDes=isDesignerCard(c,l);
  const p=c.profitData,ac=p?cents(1,p.approved):0;
  const cardCost=getProjectCardCosts(c).reduce((a,x)=>a+x.cost,0);
  const extraCost=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0;
  const cc=cardCost+extraCost,pct=ac>0?Math.round(((ac-cc)/ac)*100):0;
  let meta='';
- if(!F&&isSupp){
+ if(!F&&isDes){
+  const projs=getDesignerProjects(c.id);
+  const spec=c.specialty?`🏷️ <b>${esc(c.specialty)}</b>`:'';
+  const projTag=projs.length
+   ?`<span style="color:var(--ok);font-weight:600">📁 ${projs.map(x=>esc(x.card.title)).join(', ')}</span>`
+   :`<span style="color:var(--dg);font-weight:700">⚠️ Sin trabajo</span>`;
+  const ph=c.phone?`📞 ${esc(c.phone)}`:'';
+  meta=[spec,projTag,ph].filter(Boolean).join(' · ');
+ }else if(!F&&isSupp){
   meta=[c.specialty?`🏷️ <b>${esc(c.specialty)}</b>`:'',c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:'',c.notes?`📝 ${esc(c.notes.slice(0,30))}${c.notes.length>30?'…':''}`:''].filter(Boolean).join(' · ');
  }else if(F){
   const cost=c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'');
   const inf=[c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:''].filter(Boolean).join(' · ');
   meta=[cost,inf].filter(Boolean).join(' · ');
  }else{
-  meta=[(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0)),ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')].filter(Boolean).join(' · ');
+  const des=c.designerId?getGlobalDesigners().find(d=>d.id===c.designerId):null;
+  const desTag=des?`👤 <b>${esc(des.title)}</b>`:'<span style="color:var(--mu);font-size:11px">👤 <i>Sin diseñador</i></span>';
+  const items=(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0));
+  const mon=ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'');
+  meta=[desTag,items,mon].filter(Boolean).join(' · ');
  }
- const icon=(!F&&isSupp)?'🏭 ':(F?(isSupp?'🏭 ':''):'📁 ');
- const acts=(!F&&!isSupp)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
+ const icon=(!F&&isDes)?'🎨 ':((!F&&isSupp)?'🏭 ':(F?(isSupp?'🏭 ':''):'📁 '));
+ const acts=(!F&&!isSupp&&!isDes)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
  return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)}</span><span>${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
@@ -435,9 +500,10 @@ const A={
  delList(a){const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
   mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
  addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
-  const isSupp=isSuppCol(l);
-  const k={id,title:isSupp?'Nuevo proveedor':(F?'Nuevo ítem':'Nuevo proyecto'),isSupplier:isSupp,phone:'',location:'',notes:'',specialty:'',color:'#ffffff',qty:1,unitPrice:0,fields:[],
-   folderColumns:(isSupp&&!F)?[]:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
+  const isSupp=isSuppCol(l),isDes=isDesCol(l);
+  const k={id,title:isDes?'Nuevo diseñador':(isSupp?'Nuevo proveedor':(F?'Nuevo ítem':'Nuevo proyecto')),
+   isSupplier:isSupp,isDesigner:isDes,designerId:'',phone:'',location:'',notes:'',specialty:'',color:'#ffffff',qty:1,unitPrice:0,fields:[],
+   folderColumns:(isSupp||isDes)&&!F?[]:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
    x:50+(allCards().length%4)*260,y:50+Math.floor(allCards().length/4)*180};k.budgetData=bdef();k.profitData={approved:0,costs:[]};l.cards.push(k);save();render();A.edit({dataset:{id}})},
  callSupplier(a){
   const lid=a.dataset.l,sups=getGlobalSuppliers();
@@ -509,7 +575,7 @@ const A={
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
  const c=e.target.closest('.cd');if(c){
   const r=locate(c.dataset.id);
-  if(!F&&r&&!isSupplierCard(r.c,r.list)){A.open({dataset:{id:c.dataset.id}})}
+  if(!F&&r&&!isSupplierCard(r.c,r.list)&&!isDesignerCard(r.c,r.list)){A.open({dataset:{id:c.dataset.id}})}
   else{editCard(c.dataset.id)}
  }});
 document.addEventListener('input',e=>{if(!F||!e.target.closest?.('#pbox'))return;const P=locate(F).c.profitData,t=e.target;
@@ -541,10 +607,43 @@ function closeM(skipRender){document.querySelectorAll('.md').forEach(m=>m.remove
 addEventListener('keydown',e=>{if(e.key==='Escape')closeM();if(e.key==='Enter'&&e.target.id==='pinUrlInput'){e.preventDefault();A.savePinUrl()}});
 function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  const isSupp=isSupplierCard(c,l);
+ const isDes=isDesignerCard(c,l);
  const isGlobalSupp=!F&&isSupp;
+ const isGlobalDes=!F&&isDes;
  const fld=(l,v)=>`<div class="box fl"><input class="fk" placeholder="Título del campo" value="${esc(l)}"><textarea class="fv" rows="2" placeholder="Detalle…">${esc(v)}</textarea><button class="b d" type="button" onclick="this.parentNode.remove()">Quitar campo</button></div>`;
  let body='';
- if(isGlobalSupp){
+ if(isGlobalDes){
+  const allProjs=getGlobalProjects();
+  const assigned=getDesignerProjects(c.id).map(p=>p.card.id);
+  const projCheckboxes=allProjs.length?allProjs.map(p=>`
+   <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--cd);padding:5px 8px;border:1px solid var(--ln);border-radius:var(--r)">
+    <input type="checkbox" class="chkProj" value="${p.card.id}" ${assigned.includes(p.card.id)?'checked':''} style="width:auto">
+    <span>📁 <b>${esc(p.card.title)}</b> <span style="color:var(--mu)">(${esc(p.col.title)})</span></span>
+   </label>
+  `).join(''):'<div class="hint" style="margin:0">No hay proyectos creados aún.</div>';
+
+  body=`<h3>🎨 Ficha de Diseñador</h3>
+  <div class="f"><label>Nombre del diseñador / Apellido</label><input id="e1" value="${esc(c.title)}"></div>
+  <div class="row">
+   <div class="f"><label>Rol / Especialidad</label><input id="edes_spec" placeholder="Ej: Modelado CAD 3D, Renderista, Planos..." value="${esc(c.specialty||'')}"></div>
+   <div class="f"><label>Teléfono / Contacto / WhatsApp</label><input id="edes_phone" placeholder="Ej: +54 9 351 1234567" value="${esc(c.phone||'')}"></div>
+  </div>
+  <div class="f"><label>Email / Portfolio / Contacto</label><input id="edes_loc" placeholder="Ej: diseno@estudio.com o portfolio.com" value="${esc(c.location||'')}"></div>
+  <div class="f">
+   <label>📁 Proyectos a cargo (marcar para asignar):</label>
+   <div style="display:flex;flex-direction:column;gap:5px;max-height:140px;overflow-y:auto;padding:2px 0">
+    ${projCheckboxes}
+   </div>
+   <div class="hint" style="margin-top:4px">Si no tiene ningún proyecto asignado, su estado figurará como <b style="color:var(--dg)">Sin trabajo</b>.</div>
+  </div>
+  <div class="f"><label>Anotaciones extras / Notas</label><textarea id="edes_notes" rows="2" placeholder="Software que domina (SolidWorks, Rhino, Blender), disponibilidad horaria, observaciones...">${esc(c.notes||'')}</textarea></div>
+  <div class="row" style="align-items:center">
+   <div class="f"><label>Color de tarjeta</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div>
+   ${c.phone?`<a href="https://wa.me/${c.phone.replace(/[^0-9]/g,'')}" target="_blank" class="b" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:14px;color:var(--ok)">📲 WhatsApp</a>`:''}
+  </div>
+  <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo extra</button>
+  <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar Diseñador</button></div>`;
+ }else if(isGlobalSupp){
   body=`<h3>🏢 Ficha de Proveedor</h3>
   <div class="f"><label>Nombre del proveedor / Razón social</label><input id="e1" value="${esc(c.title)}"></div>
   <div class="row">
@@ -563,7 +662,12 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  }else{
   const sups=getGlobalSuppliers();
   const supOpts=sups.map(s=>`<option value="${s.id}" ${c.supplierId===s.id?'selected':''}>${esc(s.title)}${s.specialty?' ('+esc(s.specialty)+')':''}</option>`).join('');
+  const allDes=getGlobalDesigners();
+  const desOpts=allDes.map(d=>`<option value="${d.id}" ${c.designerId===d.id?'selected':''}>${esc(d.title)}${d.specialty?' ('+esc(d.specialty)+')':''}</option>`).join('');
   body=`<h3>${F?(isSupp?'🏭 Proveedor en proyecto':'Propiedades de ítem'):'Propiedades de proyecto'}</h3>
+  ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:end;background:var(--cd)">
+   <div class="f" style="margin:0;flex:2"><label>👤 Diseñador a cargo del proyecto:</label><select id="selDes"><option value="">— Sin diseñador asignado (Sin trabajo) —</option>${desOpts}</select></div>
+  </div>`:''}
   ${F&&sups.length?`<div class="box row" style="align-items:end;background:var(--cd)">
    <div class="f" style="margin:0;flex:2"><label>🏭 Proveedor guardado:</label><select id="selSup"><option value="">— Cargar datos de proveedor guardado —</option>${supOpts}</select></div>
    <button class="b" type="button" id="btnApplySup">Copiar datos</button>
@@ -577,7 +681,7 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
   <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`;
  }
- const m=modal(body,isGlobalSupp?'580px':'560px');
+ const m=modal(body,isGlobalSupp||isGlobalDes?'580px':'560px');
  m.querySelector('#btnApplySup')?.addEventListener('click',()=>{
   const sid=m.querySelector('#selSup').value;
   const s=getGlobalSuppliers().find(x=>x.id===sid);
@@ -592,10 +696,38 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
  m.querySelector('#ok').onclick=()=>{
   c.title=m.querySelector('#e1').value.trim()||'Sin título';
-  if(m.querySelector('#esup_spec'))c.specialty=m.querySelector('#esup_spec').value.trim();
-  if(m.querySelector('#esup_phone'))c.phone=m.querySelector('#esup_phone').value.trim();
-  if(m.querySelector('#esup_loc'))c.location=m.querySelector('#esup_loc').value.trim();
-  if(m.querySelector('#esup_notes'))c.notes=m.querySelector('#esup_notes').value.trim();
+  if(isGlobalDes){
+   if(m.querySelector('#edes_spec'))c.specialty=m.querySelector('#edes_spec').value.trim();
+   if(m.querySelector('#edes_phone'))c.phone=m.querySelector('#edes_phone').value.trim();
+   if(m.querySelector('#edes_loc'))c.location=m.querySelector('#edes_loc').value.trim();
+   if(m.querySelector('#edes_notes'))c.notes=m.querySelector('#edes_notes').value.trim();
+   c.isDesigner=true;
+   const chks=[...m.querySelectorAll('.chkProj')];
+   chks.forEach(chk=>{
+    const p=locate(chk.value)?.c;
+    if(p){
+     const oldDes=p.designerId||'';
+     if(chk.checked){
+      p.designerId=c.id;
+      syncDesignerConnection(p.id,c.id,oldDes);
+     }else if(p.designerId===c.id){
+      p.designerId='';
+      syncDesignerConnection(p.id,'',oldDes);
+     }
+    }
+   });
+  }else{
+   if(m.querySelector('#esup_spec'))c.specialty=m.querySelector('#esup_spec').value.trim();
+   if(m.querySelector('#esup_phone'))c.phone=m.querySelector('#esup_phone').value.trim();
+   if(m.querySelector('#esup_loc'))c.location=m.querySelector('#esup_loc').value.trim();
+   if(m.querySelector('#esup_notes'))c.notes=m.querySelector('#esup_notes').value.trim();
+   if(m.querySelector('#selDes')){
+    const newDesId=m.querySelector('#selDes').value;
+    const oldDesId=c.designerId||'';
+    c.designerId=newDesId;
+    syncDesignerConnection(c.id,newDesId,oldDesId);
+   }
+  }
   if(m.querySelector('#e2'))c.qty=num(m.querySelector('#e2').value);
   if(m.querySelector('#e3'))c.unitPrice=num(m.querySelector('#e3').value);
   c.color=m.querySelector('#e4').value;
@@ -720,7 +852,24 @@ const V={x:30,y:30,k:1},vp=()=>$('#vp');
 const applyV=()=>{$('#world').style.transform=`translate(${V.x}px,${V.y}px) scale(${V.k})`};
 function org(){const w=$('#world');allCards().forEach(({k,col})=>{const n=document.createElement('div');n.className='nd'+(custom(k)?' cc':'');n.dataset.id=k.id;
  n.style.cssText=`left:${k.x}px;top:${k.y}px;${custom(k)?'background:'+k.color:''}`;
- n.innerHTML=`<h4>📁 ${esc(k.title)}</h4><small>${esc(col.title)}</small><div><button data-act="open" data-id="${k.id}">📂 Abrir</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button></div>`;w.append(n)});applyV();lines()}
+ const isDes=isDesignerCard(k,col);
+ const isSup=isSupplierCard(k,col);
+ let sub='', acts='';
+ if(isDes){
+  const projs=getDesignerProjects(k.id);
+  const st=projs.length?projs.map(p=>p.card.title).join(', '):'Sin trabajo';
+  sub=`${esc(col.title)} · <b style="${projs.length?'color:var(--ok)':'color:var(--dg)'}">${esc(st)}</b>`;
+  acts=`<button data-act="edit" data-id="${k.id}">🎨 Ficha</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button>`;
+ }else if(isSup){
+  sub=`${esc(col.title)}${k.specialty?' · '+esc(k.specialty):''}`;
+  acts=`<button data-act="edit" data-id="${k.id}">🏢 Ficha</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button>`;
+ }else{
+  const des=k.designerId?getGlobalDesigners().find(d=>d.id===k.designerId):null;
+  sub=`${esc(col.title)}${des?' · 👤 '+esc(des.title):''}`;
+  acts=`<button data-act="open" data-id="${k.id}">📂 Abrir</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button>`;
+ }
+ const icon=isDes?'🎨 ':(isSup?'🏭 ':'📁 ');
+ n.innerHTML=`<h4>${icon}${esc(k.title)}</h4><small>${sub}</small><div>${acts}</div>`;w.append(n)});applyV();lines()}
 function lines(){const svg=$('#svg');if(!svg)return;svg.querySelectorAll('line').forEach(l=>l.remove());
  S.connections.forEach((cn,i)=>{const a=$(`.nd[data-id="${cn.from}"]`),b=$(`.nd[data-id="${cn.to}"]`);if(!a||!b)return;
   const c=n=>({x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2,w:n.offsetWidth/2,h:n.offsetHeight/2}),p=c(a),q=c(b),dx=q.x-p.x,dy=q.y-p.y;
