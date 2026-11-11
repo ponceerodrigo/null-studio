@@ -221,7 +221,7 @@ function normalize(d){
   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
   k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
   k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';
-  k.briefData=normBrief(k.briefData);
+  k.briefData=normBrief(k.briefData);k.pinterestUrl=typeof k.pinterestUrl==='string'?k.pinterestUrl:'';
   k.designerId=k.designerId||'';k.isDesigner=!!k.isDesigner;}));
  if(!d.columns.some(isDesCol)){
   const supIdx=d.columns.findIndex(isSuppCol);
@@ -434,7 +434,37 @@ function briefStats(B){
  const done=BRIEF_FIELDS.filter(f=>(B[f.k]||'').trim()).length;
  return{done,total:BRIEF_FIELDS.length,pct:Math.round((done/BRIEF_FIELDS.length)*100)};
 }
-function briefBodyHTML(B,rows=3){
+function normPinUrl(u){
+ const s=String(u||'').trim();
+ if(!s)return'';
+ return /^https?:\/\//i.test(s)?s:'https://'+s;
+}
+function pinLinkHTML(k){
+ const url=normPinUrl(k.pinterestUrl);
+ if(!url){
+  return `<div class="bf-sec bf-pin">
+   <label><span><span style="color:#e60023">📌</span> Tablero Pinterest</span><span class="bf-sub">Solo enlace</span></label>
+   <div style="display:flex;gap:6px">
+    <input class="pin-url-inp" placeholder="https://www.pinterest.com/usuario/tablero/" style="font-size:12px">
+    <button class="b p" data-act="savePinUrl" style="white-space:nowrap;padding:5px 10px">Guardar</button>
+   </div>
+  </div>`;
+ }
+ return `<div class="bf-sec bf-pin">
+  <label>
+   <span><span style="color:#e60023">📌</span> Tablero Pinterest</span>
+   <span style="display:flex;gap:2px;align-items:center">
+    <button class="ib" data-act="editPinUrl" title="Cambiar enlace de Pinterest">✏️</button>
+    <button class="ib" data-act="delPinUrl" title="Quitar enlace">✕</button>
+   </span>
+  </label>
+  <a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="b" style="text-decoration:none;font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px">
+   <span>Abrir en Pinterest</span><span>↗</span>
+  </a>
+ </div>`;
+}
+function briefBodyHTML(k,rows=3){
+ const B=B_init(k);
  const core=BRIEF_FIELDS.map(f=>`<div class="bf-sec">
   <label><span>${f.icon} ${f.title}</span><span class="bf-sub">${f.sub}</span></label>
   <textarea data-bf="${f.k}" rows="${rows}" placeholder="${esc(f.ph)}">${esc(B[f.k])}</textarea>
@@ -451,10 +481,11 @@ function briefBodyHTML(B,rows=3){
    <label class="lb" style="margin:0">Campos extras (<span class="bf-xcnt">${B.extras.length}</span>)</label>
   </div>
   ${extras}
-  <button class="b" data-act="addBriefExtra" style="width:100%">+ Agregar campo extra</button>`;
+  <button class="b" data-act="addBriefExtra" style="width:100%">+ Agregar campo extra</button>
+  ${pinLinkHTML(k)}`;
 }
 function briefHTML(k){
- const B=k.briefData=normBrief(k.briefData);
+ const B=B_init(k);
  if(B.collapsed){
   const st=briefStats(B);
   return `<aside class="briefbox collapsed" id="briefbox">
@@ -475,13 +506,13 @@ function briefHTML(k){
    </div>
   </h3>
   <div class="bf-prog"><div class="bf-bar"><div id="bfBar" style="width:${st.pct}%;background:${st.done===st.total?'var(--ok)':'var(--ac)'}"></div></div><span>${st.pct}%</span></div>
-  ${briefBodyHTML(B,3)}
+  ${briefBodyHTML(k,3)}
  </aside>`;
 }
 function updateBriefProgress(){
  if(!F)return;
  const k=locate(F)?.c;if(!k)return;
- const st=briefStats(k.briefData=normBrief(k.briefData));
+ const st=briefStats(B_init(k));
  const badge=$('#bfBadge'),bar=$('#bfBar'),mBadge=$('#bfMBadge');
  [badge,mBadge].forEach(el=>{if(el){el.textContent=`${st.done}/${st.total}`;el.classList.toggle('done',st.done===st.total)}});
  if(bar){bar.style.width=st.pct+'%';bar.style.background=st.done===st.total?'var(--ok)':'var(--ac)'}
@@ -489,20 +520,23 @@ function updateBriefProgress(){
 }
 function briefModal(){
  if(!F)return;
- const k=locate(F).c,B=k.briefData=normBrief(k.briefData),st=briefStats(B);
+ const k=locate(F).c,B=B_init(k),st=briefStats(B);
  modal(`<h3><span style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>📐 Brief de Diseño · ${esc(k.title)}</span><span class="bf-badge ${st.done===st.total?'done':''}" id="bfMBadge">${st.done}/${st.total}</span></span></h3>
-  <div id="briefModal" style="display:flex;flex-direction:column;gap:10px">${briefBodyHTML(B,4)}</div>
+  <div id="briefModal" style="display:flex;flex-direction:column;gap:10px">${briefBodyHTML(k,4)}</div>
   <div class="acts"><button class="b" data-act="copyBrief">📋 Copiar brief</button><button class="b p" data-act="closeM">Listo</button></div>`,'760px');
 }
 function formatBriefText(k){
- const B=normBrief(k.briefData);
+ const B=B_init(k);
  const lines=[`BRIEF DE DISEÑO — ${k.title}`,'='.repeat(36),''];
  BRIEF_FIELDS.forEach(f=>{lines.push(`${f.icon} ${f.title.toUpperCase()}:`);lines.push((B[f.k]||'').trim()||'— Sin especificar —');lines.push('')});
  const filledExtras=B.extras.filter(x=>x.label.trim()||x.value.trim());
  if(filledExtras.length){
   lines.push('➕ CAMPOS EXTRAS:');
   filledExtras.forEach(x=>lines.push(`• ${x.label.trim()||'Campo sin título'}: ${(x.value||'').trim()||'—'}`));
+  lines.push('');
  }
+ const pin=normPinUrl(k.pinterestUrl);
+ if(pin)lines.push(`📌 PINTEREST: ${pin}`);
  return lines.join('\n');
 }
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
@@ -596,22 +630,39 @@ const A={
  },
  addBriefExtra(){
   if(!F)return;
-  const B=B_init(locate(F).c);
+  const k=locate(F).c,B=B_init(k);
   B.extras.push({id:uid('bf'),label:'',value:''});save();
-  const bm=$('#briefModal');
-  if(bm){bm.innerHTML=briefBodyHTML(B,4);const ins=bm.querySelectorAll('.bf-extra input');ins[ins.length-1]?.focus()}
-  else{render();const ins=$('#briefbox')?.querySelectorAll('.bf-extra input');ins?.[ins.length-1]?.focus()}
+  const scope=refreshBriefUI(k);
+  const ins=scope?.querySelectorAll('.bf-extra input');ins?.[ins.length-1]?.focus();
  },
  delBriefExtra(a){
   if(!F)return;
-  const B=B_init(locate(F).c),i=+a.dataset.bi,ex=B.extras[i];
+  const k=locate(F).c,B=B_init(k),i=+a.dataset.bi,ex=B.extras[i];
   if(!ex)return;
   const had=!!(ex.label.trim()||ex.value.trim());
   if(had)mark();
   B.extras.splice(i,1);save();
-  const bm=$('#briefModal');
-  if(bm)bm.innerHTML=briefBodyHTML(B,4);else render();
+  refreshBriefUI(k);
   if(had)toast('Campo extra eliminado.','',()=>{closeM(true);undo()});
+ },
+ savePinUrl(a){
+  if(!F)return;
+  const inp=a?.closest('.bf-pin')?.querySelector('.pin-url-inp')||$('.pin-url-inp');
+  if(!inp)return;
+  const val=normPinUrl(inp.value);
+  if(!val)return toast('Ingresá una URL de Pinterest.','err');
+  const k=locate(F).c;k.pinterestUrl=val;save();refreshBriefUI(k);toast('Enlace de Pinterest guardado.');
+ },
+ editPinUrl(){
+  if(!F)return;
+  const k=locate(F).c;
+  const n=prompt('Nuevo enlace del tablero de Pinterest:',k.pinterestUrl||'');
+  if(n!==null){k.pinterestUrl=normPinUrl(n);save();refreshBriefUI(k);toast(k.pinterestUrl?'Enlace actualizado.':'Enlace quitado.');}
+ },
+ delPinUrl(){
+  if(!F)return;
+  const k=locate(F).c;if(!k.pinterestUrl)return;
+  mark();k.pinterestUrl='';save();refreshBriefUI(k);toast('Enlace de Pinterest quitado.','',()=>{closeM(true);undo()});
  },
  expandBrief(){briefModal()},
  copyBrief(){
@@ -624,6 +675,12 @@ const A={
  closeM(){closeM()}
 };
 function B_init(k){return k.briefData=normBrief(k.briefData)}
+function refreshBriefUI(k){
+ render();
+ const bm=$('#briefModal');
+ if(bm){bm.innerHTML=briefBodyHTML(k,4);return bm}
+ return $('#briefbox');
+}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
  const c=e.target.closest('.cd');if(c){
   const r=locate(c.dataset.id);
@@ -665,7 +722,7 @@ function dl(blob,name){const a=document.createElement('a');a.href=URL.createObje
 function modal(html,w){closeM(true);const m=document.createElement('div');m.className='md';m.innerHTML=`<div class="mb" style="${w?'width:'+w:''}" role="dialog" aria-modal="true">${html}</div>`;
  m.addEventListener('mousedown',e=>{if(e.target===m)closeM()});document.body.append(m);return m.firstChild}
 function closeM(skipRender){document.querySelectorAll('.md').forEach(m=>m.remove());if(!skipRender&&F)render()}
-addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+addEventListener('keydown',e=>{if(e.key==='Escape')closeM();if(e.key==='Enter'&&e.target.classList?.contains('pin-url-inp')){e.preventDefault();A.savePinUrl(e.target)}});
 function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  const isSupp=isSupplierCard(c,l);
  const isDes=isDesignerCard(c,l);
