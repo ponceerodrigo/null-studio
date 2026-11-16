@@ -101,6 +101,13 @@ td input{border:0;padding:4px;background:none}td.r{text-align:right;white-space:
 #gate form{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:28px;width:360px;max-width:100%}
 #gate h2{margin:0 0 6px;font-weight:300;font-size:26px}#gate h2 b{color:var(--ac)}#gate p{color:var(--mu);margin:0 0 14px}
 #gate .b{width:100%;margin-top:10px;padding:9px}#gerr{color:var(--dg);min-height:20px;margin-top:8px}
+.role-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;user-select:none}
+.role-badge.admin{background:#4f46e5;color:#fff}
+.role-badge.des{background:#059669;color:#fff}
+.badge-sec{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:1px 6px;border-radius:99px;background:#8b5cf622;color:#8b5cf6;border:1px solid #8b5cf655}
+.cd.is-secret{border-left:4px solid #8b5cf6!important;background:linear-gradient(90deg, #8b5cf612, transparent)}
+.col.is-secret{border:2px dashed #8b5cf6!important}
+.col.is-secret header{background:#8b5cf615;border-radius:var(--r) var(--r) 0 0}
 </style>
 </head>
 <body>
@@ -140,20 +147,51 @@ const cents=(q,p)=>Math.round(parseFloat(((+q||0)*(+p||0)*100).toPrecision(12)))
 const fmt=c=>'$'+(c/100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)&&n>=0?n:0};
 
-/* ---------- Bóveda cifrada (AES-GCM + PBKDF2) ---------- */
+/* ---------- Bóveda cifrada (AES-GCM + PBKDF2) & Roles ---------- */
 const te=new TextEncoder(),td=new TextDecoder();
 let S,KEY,SALT,SNAP=null,tmr;
+let RAW_VMK=null,VAULT_KEYS=null,ROLE='admin';
 const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode(...u.subarray(i,i+8192));return btoa(s)};
 const unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 async function derive(pw,salt){const k=await crypto.subtle.importKey('raw',te.encode(pw),'PBKDF2',false,['deriveKey']);
  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function wrapVMK(raw,pw,salt){
+ const k=await derive(pw,salt),iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,raw));
+ return{s:b64(salt),i:b64(iv),d:b64(ct)}}
+async function unwrapVMK(wr,pw){
+ const salt=unb(wr.s),k=await derive(pw,salt),iv=unb(wr.i),ct=unb(wr.d);
+ return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},k,ct))}
+async function importVMK(raw){return crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},false,['encrypt','decrypt'])}
 async function seal(o){const iv=crypto.getRandomValues(new Uint8Array(12));
  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},KEY,te.encode(JSON.stringify(o))));
- return{v:1,s:b64(SALT),i:b64(iv),d:b64(ct)}}
+ return{v:2,keys:VAULT_KEYS,vid:VID,s:b64(SALT||crypto.getRandomValues(new Uint8Array(16))),i:b64(iv),d:b64(ct)}}
 async function unseal(b,key){return JSON.parse(td.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb(b.i)},key,unb(b.d))))}
 const save=()=>{clearTimeout(tmr);tmr=setTimeout(flush,250)};
 async function flush(){if(!KEY||!S)return;try{LS.setItem(VK,JSON.stringify(await seal(S)))}catch(e){toast('No se pudo guardar ('+e.message+'). Descargá un respaldo ya.','err');return}
  if(CL()&&VID){LS.setItem('nl_dirty','1');push()}}
+
+async function setDesignerPassword(pw){
+ if(!pw||pw.length<4)throw new Error('Usá al menos 4 caracteres para la clave de diseñador.');
+ const salt=crypto.getRandomValues(new Uint8Array(16));
+ VAULT_KEYS=VAULT_KEYS||{};
+ VAULT_KEYS.designer=await wrapVMK(RAW_VMK,pw,salt);
+ await flush();
+ toast('Clave de diseñador guardada exitosamente.');}
+async function removeDesignerPassword(){
+ if(!confirm('¿Desactivar el acceso de diseñador? Nadie podrá ingresar como diseñador hasta que configures una nueva clave.'))return;
+ if(VAULT_KEYS)delete VAULT_KEYS.designer;
+ await flush();
+ toast('Acceso de diseñador desactivado.');}
+async function setAdminPassword(oldPw,newPw,newPw2){
+ if(newPw.length<6)throw new Error('Usá al menos 6 caracteres para la nueva clave.');
+ if(newPw!==newPw2)throw new Error('Las nuevas contraseñas no coinciden.');
+ try{await unwrapVMK(VAULT_KEYS.admin,oldPw)}catch{throw new Error('La contraseña actual de administrador es incorrecta.')}
+ const salt=crypto.getRandomValues(new Uint8Array(16));
+ VAULT_KEYS.admin=await wrapVMK(RAW_VMK,newPw,salt);
+ SALT=salt;
+ await flush();
+ toast('Contraseña de Administrador actualizada.');}
 
 /* ---------- Nube (Supabase REST): solo guarda el blob cifrado ---------- */
 let VID=null,CREV=null,CONF=false,Q=Promise.resolve();
@@ -174,11 +212,35 @@ async function pushOnce(){const c=CL();if(!c||!VID||!KEY||CONF)return;const box=
   if(!r.ok)throw new Error(r.status);
   CREV=j[0].rev;LS.setItem('nl_rev',CREV);LS.removeItem('nl_dirty');setCS('ok')
  }catch{setCS('off');toast('Sin conexión a la nube: guardado solo en esta PC. Se sube al volver.','err')}}
-async function applyRow(row,pw){let k=KEY,sl=SALT;
- if(!(SALT&&row.data.s===b64(SALT))){if(!pw)throw new Error('Reingresá tu clave para traer estos datos.');sl=unb(row.data.s);k=await derive(pw,sl)}
- let d;try{d=normalize(await unseal(row.data,k))}catch{throw new Error('Clave incorrecta para los datos de la nube.')}
+async function applyRow(row,pw){
+ let d;
+ if(row.data.keys&&row.data.keys.admin){
+  let unwrapped=null;
+  if(pw){
+   try{unwrapped=await unwrapVMK(row.data.keys.admin,pw);ROLE='admin'}
+   catch(e){
+    if(row.data.keys.designer){
+     try{unwrapped=await unwrapVMK(row.data.keys.designer,pw);ROLE='designer'}
+     catch(e2){throw new Error('Clave incorrecta para los datos de la nube.')}
+    }else{throw new Error('Clave incorrecta para los datos de la nube.')}
+   }
+   RAW_VMK=unwrapped;KEY=await importVMK(RAW_VMK);
+  }else if(!KEY&&RAW_VMK){
+   KEY=await importVMK(RAW_VMK);
+  }
+  VAULT_KEYS=row.data.keys;
+  SALT=unb(row.data.keys.admin.s);
+  if(row.data.vid)VID=row.data.vid;
+  d=normalize(await unseal(row.data,KEY));
+ }else{
+  let k=KEY,sl=SALT;
+  if(!(SALT&&row.data.s===b64(SALT))){if(!pw)throw new Error('Reingresá tu clave para traer estos datos.');sl=unb(row.data.s);k=await derive(pw,sl)}
+  try{d=normalize(await unseal(row.data,k))}catch{throw new Error('Clave incorrecta para los datos de la nube.')}
+  ROLE='admin';RAW_VMK=crypto.getRandomValues(new Uint8Array(32));KEY=await importVMK(RAW_VMK);SALT=sl;
+  VAULT_KEYS={admin:await wrapVMK(RAW_VMK,pw,SALT),designer:null};
+ }
  const v=LS.getItem(VK);if(v)LS.setItem(PK,v);SNAP=S?structuredClone(S):null;
- KEY=k;SALT=sl;S=d;CREV=row.rev;LS.setItem(VK,JSON.stringify(row.data));LS.setItem('nl_rev',CREV);LS.removeItem('nl_dirty');CONF=false}
+ S=d;CREV=row.rev;LS.setItem(VK,JSON.stringify(row.data));LS.setItem('nl_rev',CREV);LS.removeItem('nl_dirty');CONF=false}
 async function pullNow(pw){const row=await cget();if(!row)throw new Error('la nube está vacía');await applyRow(row,pw);if(F&&!locate(F))F=null;closeM();render();setCS('ok')}
 addEventListener('online',()=>{if(KEY&&LS.getItem('nl_dirty'))push()});
 addEventListener('focus',async()=>{if(!KEY||!CL()||!VID||document.querySelector('.md'))return;
@@ -215,14 +277,21 @@ const demo=()=>({columns:[{id:'c1',title:'Ideas / Backlog',cards:[]},{id:'c2',ti
 function normalize(d){
  if(!d||!Array.isArray(d.columns))throw new Error('Formato inválido');
  d.connections=Array.isArray(d.connections)?d.connections:[];d.templates=d.templates||[];
+ d.security=Object.assign({hideFinancesFromDesigner:true,designerProjectFilter:'all_non_secret'},d.security||{});
  let x=50,y=50;
- d.columns.forEach(c=>(c.cards=c.cards||[]).forEach(k=>{
-  if(k.x===undefined||k.y===undefined){k.x=x;k.y=y;x+=260;if(x>900){x=50;y+=180}}
-  k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
-  k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
-  k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';
-  k.briefData=normBrief(k.briefData);k.pinterestUrl=typeof k.pinterestUrl==='string'?k.pinterestUrl:'';
-  k.designerId=k.designerId||'';k.isDesigner=!!k.isDesigner;}));
+ d.columns.forEach(c=>{
+  c.isSecret=!!c.isSecret;
+  (c.cards=c.cards||[]).forEach(k=>{
+   if(k.x===undefined||k.y===undefined){k.x=x;k.y=y;x+=260;if(x>900){x=50;y+=180}}
+   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
+   (k.folderColumns||[]).forEach(fc=>fc.isSecret=!!fc.isSecret);
+   k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
+   k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';
+   k.briefData=normBrief(k.briefData);k.pinterestUrl=typeof k.pinterestUrl==='string'?k.pinterestUrl:'';
+   k.designerId=k.designerId||'';k.isDesigner=!!k.isDesigner;
+   k.isSecret=!!k.isSecret;k.designerAccess=k.designerAccess||'all';
+  });
+ });
  if(!d.columns.some(isDesCol)){
   const supIdx=d.columns.findIndex(isSuppCol);
   const newCol={id:uid('c'),title:'Diseñadores',cards:[]};
@@ -237,41 +306,100 @@ function bdef(d){return{num:nextNum(d),clientName:'',clientCuit:'',condIva:'Cons
 
 /* ---------- Acceso ---------- */
 let isNew=!LS.getItem(VK);
-$('#gp').textContent=isNew?'Primera vez: creá una clave. Cifra tus datos en este dispositivo; si la perdés, no hay recuperación (usá respaldos).':'Ingresá tu clave para abrir los proyectos.';
+$('#gp').textContent=isNew?'Primera vez: creá tu Clave Secreta de Administrador. Con ella tendrás control total del estudio y podrás crear claves para diseñadores.':'Ingresá tu clave (Administrador o Diseñador):';
 $('#gk2').hidden=!isNew;$('#gk2').required=isNew;$('#gb').textContent=isNew?'Crear clave y entrar':'Entrar';
 if(!crypto.subtle)$('#gerr').textContent='Este navegador necesita HTTPS (o localhost) para cifrar.';
 $('#gcl').onclick=()=>{const w=$('#gcw');w.hidden=!w.hidden;const c=CL();if(c){$('#gu').value=c.url;$('#gak').value=c.key}};
 $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#gerr');err.textContent='';$('#gb').disabled=true;
  try{
   if(!$('#gcw').hidden&&$('#gu').value.trim())LS.setItem('nl_cloud',JSON.stringify({url:$('#gu').value.trim().replace(/\/+$/,''),key:$('#gak').value.trim()}));
-  const cl=CL();let row=null,off=false;CREV=null;CONF=false;VID=cl?await vid(pw):null;
-  if(cl){try{row=await cget()}catch(x){if(isNew)throw new Error('No se pudo leer la nube: '+x.message);off=true}}
-  if(isNew&&row)await applyRow(row,pw);
-  else if(isNew){
+  const cl=CL();let row=null,off=false;CREV=null;CONF=false;
+  const rawBox=LS.getItem(VK);
+  if(isNew&&!rawBox){
    if(pw.length<6)throw new Error('Usá al menos 6 caracteres.');
    if(pw!==$('#gk2').value)throw new Error('Las claves no coinciden.');
-   SALT=crypto.getRandomValues(new Uint8Array(16));KEY=await derive(pw,SALT);
+   RAW_VMK=crypto.getRandomValues(new Uint8Array(32));
+   SALT=crypto.getRandomValues(new Uint8Array(16));
+   KEY=await importVMK(RAW_VMK);
+   VAULT_KEYS={admin:await wrapVMK(RAW_VMK,pw,SALT),designer:null};
+   ROLE='admin';
+   VID=cl?await vid(pw):null;
    let old=null;try{old=JSON.parse(LS.getItem(OLD))}catch{}
    S=normalize(old&&old.columns?old:demo());await flush();
    if(old&&await unseal(JSON.parse(LS.getItem(VK)),KEY)){LS.removeItem(OLD);toast('Datos anteriores migrados y cifrados.')}
   }else{
-   const box=JSON.parse(LS.getItem(VK));SALT=unb(box.s);KEY=await derive(pw,SALT);
-   try{S=normalize(await unseal(box,KEY))}catch{KEY=null;throw new Error('Clave incorrecta.')}
-   if(row){const lr=+LS.getItem('nl_rev')||0,dirty=!!LS.getItem('nl_dirty');
-    if(row.rev>lr&&(!dirty||confirm('La nube tiene una versión más nueva y esta PC tiene cambios sin subir.\nAceptar = usar la nube (queda copia previa). Cancelar = conservar lo de esta PC.')))await applyRow(row,pw);
-    else{CREV=row.rev;if(row.rev>lr)CONF=true}}
+   let box=rawBox?JSON.parse(rawBox):null;
+   if(cl){
+    VID=box?.vid||(await vid(pw));
+    try{row=await cget()}catch(x){if(!box)throw new Error('No se pudo leer la nube: '+x.message);off=true}
+   }
+   if(!box&&row){
+    await applyRow(row,pw);
+   }else if(box){
+    if(box.keys&&box.keys.admin){
+     let unwrapped=null;
+     try{
+      unwrapped=await unwrapVMK(box.keys.admin,pw);
+      ROLE='admin';
+     }catch(ea){
+      if(box.keys.designer){
+       try{
+        unwrapped=await unwrapVMK(box.keys.designer,pw);
+        ROLE='designer';
+       }catch(ed){throw new Error('Clave incorrecta.')}
+      }else{throw new Error('Clave incorrecta.')}
+     }
+     RAW_VMK=unwrapped;
+     KEY=await importVMK(RAW_VMK);
+     VAULT_KEYS=box.keys;
+     SALT=unb(box.keys.admin.s);
+     if(box.vid)VID=box.vid;
+     try{S=normalize(await unseal(box,KEY))}catch{throw new Error('Error al descifrar los datos.')}
+    }else{
+     SALT=unb(box.s);
+     const legKey=await derive(pw,SALT);
+     try{S=normalize(await unseal(box,legKey))}catch{KEY=null;throw new Error('Clave incorrecta.')}
+     ROLE='admin';
+     RAW_VMK=crypto.getRandomValues(new Uint8Array(32));
+     KEY=await importVMK(RAW_VMK);
+     VAULT_KEYS={admin:await wrapVMK(RAW_VMK,pw,SALT),designer:null};
+     VID=cl?await vid(pw):null;
+     await flush();
+     toast('Bóveda actualizada al nuevo sistema con soporte de Diseñador y Proyectos Secretos.');
+    }
+    if(row){
+     const lr=+LS.getItem('nl_rev')||0,dirty=!!LS.getItem('nl_dirty');
+     if(row.rev>lr&&(!dirty||confirm('La nube tiene una versión más nueva y esta PC tiene cambios sin subir.\nAceptar = usar la nube (queda copia previa). Cancelar = conservar lo de esta PC.')))await applyRow(row,pw);
+     else{CREV=row.rev;if(row.rev>lr)CONF=true}
+    }
+   }
   }
   isNew=false;$('#gate').hidden=true;$('#app').hidden=false;$('#gf').reset();F=null;render();
   setCS(!cl?'none':CONF?'conf':off?'off':'ok');
   if(CONF)toast('Conflicto con la nube: abrí ☁️ para elegir qué versión conservar.','err');
   else if(cl&&(off||(!isNew&&LS.getItem('nl_dirty'))||(row===null&&!off)))push();
+  if(ROLE==='admin')toast('👑 Modo Administrador activo. Acceso total a proyectos secretos y configuración.');
+  else toast('🎨 Modo Diseñador activo.');
  }catch(x){err.textContent=x.message}$('#gb').disabled=false};
 
 /* ---------- Utilidades de estado ---------- */
 let F=null,VIEW='board';
-function locate(id){for(const c of S.columns)for(const k of c.cards){if(k.id===id)return{c:k,list:c};for(const f of k.folderColumns)for(const s of f.cards)if(s.id===id)return{c:s,list:f,parent:k}}}
+function locate(id){for(const c of S.columns)for(const k of c.cards){if(k.id===id)return{c:k,list:c};for(const f of (k.folderColumns||[]))for(const s of (f.cards||[]))if(s.id===id)return{c:s,list:f,parent:k}}}
+function isColVisible(l){if(ROLE==='admin')return true;return!l.isSecret}
+function isCardVisible(c,l){
+ if(ROLE==='admin')return true;
+ if(c.isSecret)return false;
+ if(l&&l.isSecret)return false;
+ if(!F&&!isSupplierCard(c,l)&&!isDesignerCard(c,l)){
+  if(c.designerAccess==='none')return false;
+  if(S.security&&S.security.designerProjectFilter==='only_assigned'){
+   if(!c.designerId)return false;
+  }
+ }
+ return true;
+}
 const cur=()=>F?locate(F).c.folderColumns:S.columns;
-const allCards=()=>S.columns.flatMap(c=>c.cards.map(k=>({k,col:c})));
+const allCards=()=>S.columns.filter(isColVisible).flatMap(c=>(c.cards||[]).filter(k=>isCardVisible(k,c)).map(k=>({k,col:c})));
 function toast(m,kind,fn){const t=document.createElement('div');t.className='ts '+(kind||'');t.append(m);
  if(fn){const b=document.createElement('button');b.textContent='Deshacer';b.onclick=()=>{fn();t.remove()};t.append(b)}
  $('#toasts').append(t);setTimeout(()=>t.remove(),kind==='err'||fn?9000:4000)}
@@ -310,6 +438,19 @@ function getGlobalProjects(){
  const list=[];
  if(!S||!Array.isArray(S.columns))return list;
  S.columns.forEach(col=>{
+  if(!isSuppCol(col)&&!isDesCol(col)&&isColVisible(col)){
+   (col.cards||[]).forEach(c=>{
+    if(!isSupplierCard(c,col)&&!isDesignerCard(c,col)&&isCardVisible(c,col))list.push({card:c,col});
+   });
+  }
+ });
+ return list;
+}
+
+function getAllProjectsRaw(){
+ const list=[];
+ if(!S||!Array.isArray(S.columns))return list;
+ S.columns.forEach(col=>{
   if(!isSuppCol(col)&&!isDesCol(col)){
    (col.cards||[]).forEach(c=>{
     if(!isSupplierCard(c,col)&&!isDesignerCard(c,col))list.push({card:c,col});
@@ -336,29 +477,58 @@ function syncDesignerConnection(projId, newDesId, oldDesId){
 }
 
 /* ---------- Render ---------- */
+function renderTools(){
+ const t=$('.tools');if(!t)return;
+ const th=LS.getItem('nl_theme')||'auto';
+ const thLabel={auto:'🌗 Auto',light:'☀️ Claro',dark:'🌙 Oscuro'}[th];
+ if(ROLE==='admin'){
+  t.innerHTML=`<span class="role-badge admin" title="Modo Administrador: ves todo">👑 Administrador</span>
+   <button class="b" data-act="accessModal" title="Gestión de contraseñas y permisos de diseñadores" style="border-color:#4f46e5;color:#4f46e5;font-weight:700">🔑 Permisos y Claves</button>
+   <button class="b" data-act="cloud" id="bcl" title="Sincronización en la nube">☁️</button>
+   <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro">${thLabel}</button>
+   <button class="b" data-act="export" title="Descargar respaldo cifrado">💾 Respaldo</button>
+   <label class="b" title="Cargar respaldo (.json)">📂 Cargar<input type="file" id="imp" accept=".json" hidden></label>
+   <button class="b" data-act="restore" title="Volver a la copia anterior">↩ Copia previa</button>
+   <button class="b" data-act="lock" title="Cerrar sesión">🔒</button>`;
+  const imp=$('#imp');if(imp)imp.onchange=handleImport;
+  setCS(!CL()?'none':CONF?'conf':VID?'ok':'none');
+ }else{
+  t.innerHTML=`<span class="role-badge des" title="Modo Diseñador: solo ves los proyectos autorizados">🎨 Diseñador</span>
+   <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro">${thLabel}</button>
+   <button class="b" data-act="lock" title="Cerrar sesión">🔒 Salir</button>`;
+ }
+}
+
 function render(){
- const curProj=F?locate(F).c:null;
+ renderTools();
+ const curProj=F?locate(F)?.c:null;
+ if(F&&(!curProj||!isCardVisible(curProj))){F=null;render();return}
  const curDes=curProj&&curProj.designerId?getGlobalDesigners().find(d=>d.id===curProj.designerId):null;
  const desBadge=curDes?`<span class="b" style="margin-left:8px;font-size:12px;padding:3px 8px;font-weight:600" title="Diseñador a cargo">👤 ${esc(curDes.title)}</span>`:'';
- $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(curProj.title)}</span>${desBadge}<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`
+ const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
+ const budBtn=showFin?`<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`:'';
+ $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(curProj.title)}</span>${desBadge}${budBtn}`
   :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>`;
  const m=$('#main');
  if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
   <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
- m.innerHTML=`<div class="board">${cur().map(l=>{
+ m.innerHTML=`<div class="board">${cur().filter(isColVisible).map(l=>{
   const isSup=isSuppCol(l);
   const isDes=isDesCol(l);
-  return `<section class="col"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista"><span class="n">${l.cards.length}</span><button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button></header>
-  <div class="cl" data-drop="${l.id}">${l.cards.map(cardHTML).join('')}</div>
+  const isColSec=!!l.isSecret;
+  const cards=(l.cards||[]).filter(c=>isCardVisible(c,l));
+  const secColBtn=ROLE==='admin'?`<button class="ib" data-act="quickColSecret" data-l="${l.id}" title="${isColSec?'Lista Secreta (oculta para diseñadores). Clic para hacerla visible.':'Lista Visible. Clic para hacerla secreta.'}">${isColSec?'🔒':'👁️'}</button>`:'';
+  return `<section class="col ${isColSec?'is-secret':''}"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista">${isColSec?'<span class="badge-sec" style="font-size:10px">🔒</span>':''}<span class="n">${cards.length}</span>${secColBtn}${ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button>`:''}</header>
+  <div class="cl" data-drop="${l.id}">${cards.map(cardHTML).join('')}</div>
   <div style="display:flex;gap:4px">
    <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isDes&&!F?'Añadir diseñador':(isSup&&!F?'Añadir proveedor':'Añadir tarjeta')}</button>
    ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button>`:''}
   </div></section>`;
- }).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
+ }).join('')}${ROLE==='admin'||F?'<button class="addcol" data-act="addList">+ Añadir lista</button>':''}</div>`;
  if(F){
   const pr=locate(F).c;
-  m.innerHTML=`<div class="pview">${m.innerHTML}${briefHTML(pr)}${profitHTML(pr)}</div>`;
-  calcProfit();
+  m.innerHTML=`<div class="pview">${m.innerHTML}${briefHTML(pr)}${showFin?profitHTML(pr):''}</div>`;
+  if(showFin)calcProfit();
   updateBriefProgress();
  }}
 function getProjectCardCosts(k){
@@ -541,6 +711,7 @@ function formatBriefText(k){
 }
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
 function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l),isDes=isDesignerCard(c,l);
+ const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
  const p=c.profitData,ac=p?cents(1,p.approved):0;
  const cardCost=getProjectCardCosts(c).reduce((a,x)=>a+x.cost,0);
  const extraCost=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0;
@@ -559,34 +730,39 @@ function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(
  }else if(F){
   const cost=c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'');
   const inf=[c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:''].filter(Boolean).join(' · ');
-  meta=[cost,inf].filter(Boolean).join(' · ');
+  meta=[(showFin?cost:''),inf].filter(Boolean).join(' · ');
  }else{
   const des=c.designerId?getGlobalDesigners().find(d=>d.id===c.designerId):null;
   const desTag=des?`👤 <b>${esc(des.title)}</b>`:'<span style="color:var(--mu);font-size:11px">👤 <i>Sin diseñador</i></span>';
   const bSt=c.briefData?briefStats(normBrief(c.briefData)):null;
   const bTag=bSt&&bSt.done?`📐 Brief ${bSt.done}/${bSt.total}`:'';
   const items=(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0));
-  const mon=ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'');
+  const mon=showFin?(ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')):'';
   meta=[desTag,bTag,items,mon].filter(Boolean).join(' · ');
  }
  const icon=(!F&&isDes)?'🎨 ':((!F&&isSupp)?'🏭 ':(F?(isSupp?'🏭 ':''):'📁 '));
- const acts=(!F&&!isSupp&&!isDes)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
- return `<div class="cd ${custom(c)?'cc':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)}</span><span>${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
+ const secTag=(ROLE==='admin'&&c.isSecret)?`<span class="badge-sec">🔒 Secreto</span>`:'';
+ const secBtn=(ROLE==='admin'&&!isSupp&&!isDes)?`<button class="ib" data-act="quickSecret" data-id="${c.id}" title="${c.isSecret?'Proyecto Secreto (clic para hacerlo visible a diseñadores)':'Proyecto Visible (clic para hacerlo secreto/oculto)'}">${c.isSecret?'🔒':'👁️'}</button>`:'';
+ const acts=(!F&&!isSupp&&!isDes&&showFin)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
+ return `<div class="cd ${custom(c)?'cc':''} ${c.isSecret?'is-secret':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)} ${secTag}</span><span>${secBtn}${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button>${ROLE==='admin'||F?`<button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button>`:''}</span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
 const A={
  theme(){const o=['auto','light','dark'],c=LS.getItem('nl_theme')||'auto';LS.setItem('nl_theme',o[(o.indexOf(c)+1)%3]);applyTheme()},
  view(a){VIEW=a.dataset.v;render()},home(){F=null;render()},
- lock(){flush().then(()=>{S=KEY=VID=null;$('#app').hidden=true;$('#gate').hidden=false;$('#gk').value='';$('#gk').focus()})},
- addList(){const t=prompt('Nombre de la nueva lista:');if(t){cur().push({id:uid('l'),title:t,cards:[]});save();render()}},
- delList(a){const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
+ lock(){flush().then(()=>{S=KEY=VID=RAW_VMK=VAULT_KEYS=null;ROLE='admin';$('#app').hidden=true;$('#gate').hidden=false;$('#gk').value='';$('#gk').focus();toast('Sesión cerrada.')})},
+ addList(){if(ROLE!=='admin'&&!F)return toast('Solo el Administrador puede añadir listas principales.','err');const t=prompt('Nombre de la nueva lista:');if(t){cur().push({id:uid('l'),title:t,cards:[]});save();render()}},
+ delList(a){if(ROLE!=='admin')return toast('Solo el Administrador puede eliminar listas.','err');const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
   mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
  addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
   const isSupp=isSuppCol(l),isDes=isDesCol(l);
   const k={id,title:isDes?'Nuevo diseñador':(isSupp?'Nuevo proveedor':(F?'Nuevo ítem':'Nuevo proyecto')),
    isSupplier:isSupp,isDesigner:isDes,designerId:'',phone:'',location:'',notes:'',specialty:'',color:'#ffffff',qty:1,unitPrice:0,fields:[],
    folderColumns:(isSupp||isDes)&&!F?[]:[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}],
-   x:50+(allCards().length%4)*260,y:50+Math.floor(allCards().length/4)*180};k.budgetData=bdef();k.profitData={approved:0,costs:[]};k.briefData=briefDef();l.cards.push(k);save();render();A.edit({dataset:{id}})},
+   x:50+(allCards().length%4)*260,y:50+Math.floor(allCards().length/4)*180,isSecret:false,designerAccess:'all'};k.budgetData=bdef();k.profitData={approved:0,costs:[]};k.briefData=briefDef();l.cards.push(k);save();render();A.edit({dataset:{id}})},
+ quickSecret(a){if(ROLE!=='admin')return;const r=locate(a.dataset.id);if(!r)return;r.c.isSecret=!r.c.isSecret;save();render();toast(r.c.isSecret?`🔒 «${r.c.title}» ahora es un Proyecto Secreto (solo tú lo ves).`:`👁️ «${r.c.title}» ahora es visible para diseñadores.`)},
+ quickColSecret(a){if(ROLE!=='admin')return;const l=cur().find(x=>x.id===a.dataset.l);if(!l)return;l.isSecret=!l.isSecret;save();render();toast(l.isSecret?`🔒 Lista «${l.title}» ahora es secreta (oculta para diseñadores).`:`👁️ Lista «${l.title}» ahora es visible.`)},
+ accessModal(){accessModal()},
  callSupplier(a){
   const lid=a.dataset.l,sups=getGlobalSuppliers();
   if(!sups.length)return toast('No hay proveedores en la lista "Proveedores" del tablero principal. Creá uno allí primero.','err');
@@ -613,16 +789,16 @@ const A={
   l.cards.push(k);save();closeM();render();editCard(id);toast(`Proveedor «${s.title}» agregado al proyecto.`);
  },
  delCard(a){mark();const r=locate(a.dataset.id);r.list.cards.splice(r.list.cards.indexOf(r.c),1);S.connections=S.connections.filter(c=>c.from!==r.c.id&&c.to!==r.c.id);save();render();toast(`"${r.c.title}" eliminada.`,'',undo)},
- open(a){F=a.dataset.id;VIEW='board';render()},
- edit(a){editCard(a.dataset.id)},budget(a){budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
+ open(a){const r=locate(a.dataset.id);if(r&&!isCardVisible(r.c,r.list))return toast('No tienes acceso a esta carpeta.','err');F=a.dataset.id;VIEW='board';render()},
+ edit(a){editCard(a.dataset.id)},budget(a){if(ROLE==='designer'&&S.security?.hideFinancesFromDesigner)return toast('Acceso restringido en Modo Diseñador.','err');budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
  addCost(){if(!F)return;const P=locate(F).c.profitData;P.costs.push({id:uid('c'),desc:'',amount:0});save();render();const r=document.querySelectorAll('#pCosts .pcd');r[r.length-1]?.focus()},
  delCost(a){if(!F)return;const P=locate(F).c.profitData;P.costs.splice(+a.dataset.ci,1);save();render()},
  syncBud(){if(!F)return;const c=locate(F).c,tot=totalC(c.budgetData)/100;if(!tot)return toast('El presupuesto 📊 todavía está en $0.','err');c.profitData.approved=tot;delete c.profitData.manualApproved;save();render();toast('Monto sincronizado con el presupuesto.')},
- export(){flush().then(()=>{const b=new Blob([LS.getItem(VK)],{type:'application/json'});dl(b,'null_studio_respaldo_'+new Date().toISOString().slice(0,10)+'.json');toast('Respaldo cifrado descargado. Se abre con tu clave.')})},
- restore(){const p=LS.getItem(PK);if(!p)return toast('Todavía no hay copia previa.','err');
+ export(){if(ROLE!=='admin')return toast('Solo el Administrador puede descargar respaldos.','err');flush().then(()=>{const b=new Blob([LS.getItem(VK)],{type:'application/json'});dl(b,'null_studio_respaldo_'+new Date().toISOString().slice(0,10)+'.json');toast('Respaldo cifrado descargado. Se abre con tu clave de Administrador.')})},
+ restore(){if(ROLE!=='admin')return toast('Solo el Administrador puede restaurar copias previas.','err');const p=LS.getItem(PK);if(!p)return toast('Todavía no hay copia previa.','err');
   if(!confirm('Se reemplazan los datos actuales por la copia previa (guardada antes de tu último borrado o importación). ¿Continuar?'))return;
   unseal(JSON.parse(p),KEY).then(d=>{mark();S=normalize(d);F=null;save();render();toast('Copia previa restaurada.','',undo)}).catch(()=>toast('La copia previa no se pudo abrir con esta clave.','err'))},
- cloud(){cloudModal()},zoom(a){zoomAt(+a.dataset.d,vp().clientWidth/2,vp().clientHeight/2)},fit(){fitView()},
+ cloud(){if(ROLE!=='admin')return toast('Solo el Administrador puede configurar la nube.','err');cloudModal()},zoom(a){zoomAt(+a.dataset.d,vp().clientWidth/2,vp().clientHeight/2)},fit(){fitView()},
  toggleBriefBox(){
   if(!F)return;
   const k=locate(F).c;B_init(k).collapsed=!k.briefData.collapsed;
@@ -684,6 +860,7 @@ function refreshBriefUI(k){
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.stopPropagation();return A[a.dataset.act]?.(a,e)}
  const c=e.target.closest('.cd');if(c){
   const r=locate(c.dataset.id);
+  if(!r||!isCardVisible(r.c,r.list))return;
   if(!F&&r&&!isSupplierCard(r.c,r.list)&&!isDesignerCard(r.c,r.list)){A.open({dataset:{id:c.dataset.id}})}
   else{editCard(c.dataset.id)}
  }});
@@ -709,13 +886,28 @@ document.addEventListener('dragleave',e=>e.target.classList?.remove('over'));
 document.addEventListener('drop',e=>{const d=e.target.closest?.('.cl');if(!d||!dragId)return;e.preventDefault();
  const to=cur().find(l=>l.id===d.dataset.drop),from=cur().find(l=>l.cards.some(c=>c.id===dragId));
  if(to&&from){const c=from.cards.splice(from.cards.findIndex(c=>c.id===dragId),1)[0];to.cards.push(c);save();render()}});
-$('#imp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
- try{let j=JSON.parse(await f.text()),d;
-  if(j.d&&j.s){try{d=await unseal(j,KEY)}catch{const pw=prompt('Este respaldo usa otra clave. Ingresala:');if(!pw)return;d=await unseal(j,await derive(pw,unb(j.s)))}}else d=j;
+async function handleImport(e){
+ const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{
+  let j=JSON.parse(await f.text()),d;
+  if(j.v===2&&j.keys&&j.keys.admin){
+   try{d=await unseal(j,KEY)}catch{
+    const pw=prompt('Este respaldo usa otra clave de Administrador. Ingresala:');if(!pw)return;
+    const unwrapped=await unwrapVMK(j.keys.admin,pw);
+    d=await unseal(j,await importVMK(unwrapped));
+   }
+  }else if(j.d&&j.s){
+   try{d=await unseal(j,KEY)}catch{
+    const pw=prompt('Este respaldo usa otra clave. Ingresala:');if(!pw)return;
+    d=await unseal(j,await derive(pw,unb(j.s)));
+   }
+  }else d=j;
   d=normalize(d);const n=d.columns.reduce((a,c)=>a+c.cards.length,0);
   if(!confirm(`El archivo tiene ${d.columns.length} listas y ${n} proyectos. Reemplaza los datos actuales (queda una copia previa para volver). ¿Importar?`))return;
-  mark();S=d;F=null;save();render();toast('Datos importados.','',undo)
- }catch(x){toast('No se pudo importar: archivo dañado o clave incorrecta.','err')}};
+  mark();S=d;F=null;save();render();toast('Datos importados.','',undo);
+ }catch(x){toast('No se pudo importar: archivo dañado o clave incorrecta.','err')}
+}
+const initImp=$('#imp');if(initImp)initImp.onchange=handleImport;
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 
 /* ---------- Modales ---------- */
@@ -782,24 +974,48 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   const supOpts=sups.map(s=>`<option value="${s.id}" ${c.supplierId===s.id?'selected':''}>${esc(s.title)}${s.specialty?' ('+esc(s.specialty)+')':''}</option>`).join('');
   const allDes=getGlobalDesigners();
   const desOpts=allDes.map(d=>`<option value="${d.id}" ${c.designerId===d.id?'selected':''}>${esc(d.title)}${d.specialty?' ('+esc(d.specialty)+')':''}</option>`).join('');
+  const curDes=c.designerId?allDes.find(d=>d.id===c.designerId):null;
+  const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
   body=`<h3>${F?(isSupp?'🏭 Proveedor en proyecto':'Propiedades de ítem'):'Propiedades de proyecto'}</h3>
   ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:end;background:var(--cd)">
    <div class="f" style="margin:0;flex:2"><label>👤 Diseñador a cargo del proyecto:</label><select id="selDes"><option value="">— Sin diseñador asignado (Sin trabajo) —</option>${desOpts}</select></div>
+  </div>`:''}
+  ${ROLE==='admin'?`<div class="box" style="background:var(--cd);border-left:4px solid #8b5cf6">
+   <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+     <b style="color:#8b5cf6">🔒 Visibilidad y Privacidad</b>
+     <div class="hint" style="margin:2px 0 0">Definí si este elemento es secreto o si los diseñadores pueden verlo.</div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer">
+     <input type="checkbox" id="chkIsSecret" ${c.isSecret?'checked':''} style="width:auto">
+     <span>🔒 Secreto (Solo Admin)</span>
+    </label>
+   </div>
+   ${!F&&!isSupp&&!isDes?`<div id="secDetails" style="margin-top:8px;${c.isSecret?'display:none;':''}">
+    <label style="font-size:12px;color:var(--mu)">Diseñadores que pueden ver esta carpeta:</label>
+    <select id="selDesAccess">
+     <option value="all" ${c.designerAccess!=='assigned'?'selected':''}>👥 Visible para todos los diseñadores</option>
+     <option value="assigned" ${c.designerAccess==='assigned'?'selected':''}>👤 Solo para el diseñador asignado (${curDes?esc(curDes.title):'nadie asignado todavía'})</option>
+    </select>
+   </div>`:''}
   </div>`:''}
   ${F&&sups.length?`<div class="box row" style="align-items:end;background:var(--cd)">
    <div class="f" style="margin:0;flex:2"><label>🏭 Proveedor guardado:</label><select id="selSup"><option value="">— Cargar datos de proveedor guardado —</option>${supOpts}</select></div>
    <button class="b" type="button" id="btnApplySup">Copiar datos</button>
   </div>`:''}
   <div class="f"><label>Nombre</label><input id="e1" value="${esc(c.title)}"></div>
-  <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div><div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>
+  <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div>${showFin?`<div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>`:''}
   <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div></div>
   ${F?`<div class="row"><div class="f"><label>Teléfono / Contacto</label><input id="esup_phone" placeholder="Opcional" value="${esc(c.phone||'')}"></div><div class="f"><label>Ubicación</label><input id="esup_loc" placeholder="Opcional" value="${esc(c.location||'')}"></div></div>
   <div class="f"><label>Anotaciones extras</label><textarea id="esup_notes" rows="2" placeholder="Notas sobre el trabajo, entrega, etc.">${esc(c.notes||'')}</textarea></div>`:''}
-  ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`:''}
+  ${(!F&&!r.parent&&!isSupp&&showFin)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`:''}
   <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
   <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`;
  }
  const m=modal(body,isGlobalSupp||isGlobalDes?'580px':'560px');
+ m.querySelector('#chkIsSecret')?.addEventListener('change',e=>{
+  const d=m.querySelector('#secDetails');if(d)d.style.display=e.target.checked?'none':'block';
+ });
  m.querySelector('#btnApplySup')?.addEventListener('click',()=>{
   const sid=m.querySelector('#selSup').value;
   const s=getGlobalSuppliers().find(x=>x.id===sid);
@@ -814,6 +1030,10 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
  m.querySelector('#ok').onclick=()=>{
   c.title=m.querySelector('#e1').value.trim()||'Sin título';
+  if(m.querySelector('#chkIsSecret')){
+   c.isSecret=m.querySelector('#chkIsSecret').checked;
+   if(m.querySelector('#selDesAccess'))c.designerAccess=m.querySelector('#selDesAccess').value;
+  }
   if(isGlobalDes){
    if(m.querySelector('#edes_spec'))c.specialty=m.querySelector('#edes_spec').value.trim();
    if(m.querySelector('#edes_phone'))c.phone=m.querySelector('#edes_phone').value.trim();
@@ -858,8 +1078,149 @@ function linkModal(id){const me=locate(id).c,opts=allCards().filter(x=>x.k.id!==
  const m=modal(`<h3>Conectar «${esc(me.title)}»</h3><div class="f"><label>Con el proyecto</label><select id="lt">${opts}</select></div><div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Crear enlace</button></div>`,'420px');
  m.querySelector('#ok').onclick=()=>{const to=m.querySelector('#lt').value;if(!S.connections.some(c=>c.from===id&&c.to===to)){S.connections.push({from:id,to});save();lines()}closeM()}}
 
+/* ---------- Permisos, Claves y Proyectos Secretos ---------- */
+function accessModal(){
+ if(ROLE!=='admin')return;
+ const hasDes=!!(VAULT_KEYS&&VAULT_KEYS.designer);
+ const sec=S.security=Object.assign({hideFinancesFromDesigner:true,designerProjectFilter:'all_non_secret'},S.security||{});
+ const allProjs=getAllProjectsRaw();
+ const allDes=getGlobalDesigners();
+
+ const projsRows=allProjs.length?allProjs.map(p=>{
+  const des=p.card.designerId?allDes.find(d=>d.id===p.card.designerId):null;
+  const isSec=!!p.card.isSecret;
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);margin-bottom:6px">
+   <div style="min-width:0;flex:1">
+    <div style="font-weight:700;display:flex;align-items:center;gap:6px">
+     <span>📁 ${esc(p.card.title)}</span>
+     ${isSec?'<span class="badge-sec">🔒 Secreto (Solo Admin)</span>':'<span style="font-size:11px;color:var(--ok);font-weight:600">👥 Visible para diseñadores</span>'}
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-top:2px">
+     Columna: <b>${esc(p.col.title)}</b> · Diseñador asignado: ${des?`👤 ${esc(des.title)}`:'<i>Sin asignar</i>'}
+    </div>
+   </div>
+   <button class="b ${isSec?'p':''}" data-act="toggleProjSecInModal" data-id="${p.card.id}" style="font-size:12px;white-space:nowrap">
+    ${isSec?'🔓 Hacer Visible':'🔒 Hacer Secreto'}
+   </button>
+  </div>`;
+ }).join(''):'<div class="hint">No hay proyectos en el tablero aún.</div>';
+
+ const m=modal(`<h3>🔑 Control de Acceso, Claves y Proyectos Secretos</h3>
+ <p class="hint">Configurá tu clave secreta de Administrador, la clave para Diseñadores y qué carpetas/proyectos puede ver cada uno.</p>
+
+ <div class="box" style="background:var(--cd);border-left:4px solid #4f46e5;margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+   <b style="font-size:14px;color:#4f46e5">👑 Contraseña Secreta de Administrador (Tú)</b>
+   <span class="role-badge admin" style="font-size:11px">Activa</span>
+  </div>
+  <p style="font-size:12px;color:var(--mu);margin:0 0 8px">Con esta clave entrás en modo administrador con acceso total a proyectos secretos, finanzas y control de permisos.</p>
+  <details>
+   <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--ac)">Cambiar mi contraseña de Administrador</summary>
+   <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+    <input type="password" id="mCurAdminPw" placeholder="Contraseña de Administrador actual">
+    <div class="row">
+     <input type="password" id="mNewAdminPw" placeholder="Nueva contraseña (mínimo 6 caracteres)">
+     <input type="password" id="mNewAdminPw2" placeholder="Repetir nueva contraseña">
+    </div>
+    <button class="b p" id="btnChgAdminPw" style="align-self:flex-start;margin-top:4px">Actualizar Clave de Administrador</button>
+   </div>
+  </details>
+ </div>
+
+ <div class="box" style="background:var(--cd);border-left:4px solid #059669;margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+   <b style="font-size:14px;color:#059669">🎨 Contraseña para Diseñadores</b>
+   <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;${hasDes?'background:#05966922;color:#059669':'background:var(--ln);color:var(--mu)'}">
+    ${hasDes?'🟢 Clave Configurada y Activa':'⚪ Sin Clave (Acceso Desactivado)'}
+   </span>
+  </div>
+  <p style="font-size:12px;color:var(--mu);margin:0 0 8px">El diseñador ingresa esta clave en la pantalla de inicio para entrar al portal en Modo Diseñador (solo verá las carpetas que tú autorices).</p>
+  <div class="row" style="align-items:center">
+   <input type="password" id="mDesPw" placeholder="${hasDes?'Escribí una nueva clave para cambiarla...':'Creá una clave para el diseñador...'}" style="flex:2">
+   <input type="password" id="mDesPw2" placeholder="Repetir clave" style="flex:2">
+   <button class="b p" id="btnSaveDesPw" style="flex:1;white-space:nowrap">${hasDes?'Cambiar Clave':'Activar Clave'}</button>
+   ${hasDes?`<button class="b d" id="btnDelDesPw" title="Quitar clave para que nadie pueda entrar como diseñador" style="flex:1;white-space:nowrap">Desactivar</button>`:''}
+  </div>
+ </div>
+
+ <div class="box" style="background:var(--cd);margin-bottom:12px">
+  <b style="font-size:14px">🛡️ Reglas de Privacidad para Diseñadores</b>
+  <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+    <input type="checkbox" id="mHideFin" ${sec.hideFinancesFromDesigner?'checked':''} style="width:auto">
+    <span><b>Ocultar datos financieros y presupuestos:</b> El diseñador no verá montos aprobados de clientes, márgenes de ganancia ni presupuestos en Excel.</span>
+   </label>
+   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+    <input type="checkbox" id="mOnlyAssigned" ${sec.designerProjectFilter==='only_assigned'?'checked':''} style="width:auto">
+    <span><b>Solo proyectos asignados:</b> El diseñador solo podrá ver las carpetas/proyectos en los que esté asignado como diseñador a cargo.</span>
+   </label>
+  </div>
+ </div>
+
+ <div class="box" style="background:var(--cd)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+   <b style="font-size:14px">📁 Control Rápido de Proyectos y Carpetas Secretas</b>
+   <span class="hint" style="margin:0">${allProjs.filter(p=>p.card.isSecret).length} secretos de ${allProjs.length} proyectos</span>
+  </div>
+  <div style="max-height:220px;overflow-y:auto;padding-right:2px">
+   ${projsRows}
+  </div>
+ </div>
+
+ <div class="acts">
+  <button class="b p" data-act="closeM">Listo</button>
+ </div>`,'740px');
+
+ m.querySelector('#btnChgAdminPw')?.addEventListener('click',async()=>{
+  const curPw=m.querySelector('#mCurAdminPw').value;
+  const n1=m.querySelector('#mNewAdminPw').value;
+  const n2=m.querySelector('#mNewAdminPw2').value;
+  try{
+   await setAdminPassword(curPw,n1,n2);
+   closeM();
+  }catch(x){toast(x.message,'err')}
+ });
+
+ m.querySelector('#btnSaveDesPw')?.addEventListener('click',async()=>{
+  const p1=m.querySelector('#mDesPw').value;
+  const p2=m.querySelector('#mDesPw2').value;
+  if(!p1)return toast('Ingresá una clave para el diseñador.','err');
+  if(p1!==p2)return toast('Las claves para diseñador no coinciden.','err');
+  try{
+   await setDesignerPassword(p1);
+   accessModal();
+  }catch(x){toast(x.message,'err')}
+ });
+
+ m.querySelector('#btnDelDesPw')?.addEventListener('click',async()=>{
+  try{
+   await removeDesignerPassword();
+   accessModal();
+  }catch(x){toast(x.message,'err')}
+ });
+
+ const saveSec=()=>{
+  sec.hideFinancesFromDesigner=m.querySelector('#mHideFin').checked;
+  sec.designerProjectFilter=m.querySelector('#mOnlyAssigned').checked?'only_assigned':'all_non_secret';
+  save();render();
+ };
+ m.querySelector('#mHideFin')?.addEventListener('change',saveSec);
+ m.querySelector('#mOnlyAssigned')?.addEventListener('change',saveSec);
+
+ m.querySelectorAll('[data-act="toggleProjSecInModal"]').forEach(btn=>{
+  btn.onclick=()=>{
+   const p=locate(btn.dataset.id)?.c;
+   if(p){
+    p.isSecret=!p.isSecret;
+    save();render();accessModal();
+    toast(p.isSecret?`«${p.title}» es ahora un Proyecto Secreto.`:`«${p.title}» es ahora visible para diseñadores.`);
+   }
+  };
+ });
+}
+
 /* ---------- Presupuesto ---------- */
-function budgetModal(id){const c=locate(id).c;const B=c.budgetData=Object.assign(bdef(),c.budgetData);B.style=Object.assign({},bdef().style,B.style);
+function budgetModal(id){if(ROLE==='designer'&&S.security?.hideFinancesFromDesigner)return toast('Acceso restringido en Modo Diseñador.','err');const c=locate(id).c;const B=c.budgetData=Object.assign(bdef(),c.budgetData);B.style=Object.assign({},bdef().style,B.style);
  const inp=(k,l,t)=>`<div class="f"><label>${l}</label><input data-b="${k}" type="${t||'text'}" value="${esc(B[k])}"></div>`,sin=(k,l,t)=>`<div class="f"><label>${l}</label><input data-s="${k}" type="${t||'text'}" value="${esc(B.style[k])}"></div>`;
  const m=modal(`<h3>Presupuesto · ${esc(c.title)}</h3>
  <div class="box row" style="align-items:end"><div class="f" style="margin:0"><label>Plantilla</label><select id="tp"><option value="">— elegir plantilla —</option>${S.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
@@ -983,7 +1344,7 @@ function org(){const w=$('#world');allCards().forEach(({k,col})=>{const n=docume
   acts=`<button data-act="edit" data-id="${k.id}">🏢 Ficha</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button>`;
  }else{
   const des=k.designerId?getGlobalDesigners().find(d=>d.id===k.designerId):null;
-  sub=`${esc(col.title)}${des?' · 👤 '+esc(des.title):''}`;
+  sub=`${esc(col.title)}${des?' · 👤 '+esc(des.title):''}${ROLE==='admin'&&k.isSecret?' · <span style="color:#8b5cf6;font-weight:700">🔒 Secreto</span>':''}`;
   acts=`<button data-act="open" data-id="${k.id}">📂 Abrir</button><button data-act="link" data-id="${k.id}">🔗 Conectar</button>`;
  }
  const icon=isDes?'🎨 ':(isSup?'🏭 ':'📁 ');
