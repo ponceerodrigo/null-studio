@@ -942,6 +942,21 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
    <div class="f"><label>Teléfono / Contacto / WhatsApp</label><input id="edes_phone" placeholder="Ej: +54 9 351 1234567" value="${esc(c.phone||'')}"></div>
   </div>
   <div class="f"><label>Email / Portfolio / Contacto</label><input id="edes_loc" placeholder="Ej: diseno@estudio.com o portfolio.com" value="${esc(c.location||'')}"></div>
+
+  ${ROLE==='admin'?`<div class="box" style="background:var(--cd);border-left:4px solid #059669;margin-bottom:12px">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <b style="color:#059669">🔑 Contraseña de acceso al portal para diseñadores</b>
+    <span style="font-size:11px;font-weight:700;color:${VAULT_KEYS&&VAULT_KEYS.designer?'var(--ok)':'var(--mu)'}">
+     ${VAULT_KEYS&&VAULT_KEYS.designer?'🟢 Clave activa':'⚪ Sin clave activa'}
+    </span>
+   </div>
+   <div class="hint" style="margin:0 0 6px">La contraseña que ingresará el diseñador en el inicio para acceder al tablero:</div>
+   <div style="display:flex;gap:6px">
+    <input type="password" id="edes_pw" placeholder="${VAULT_KEYS&&VAULT_KEYS.designer?'Escribí una nueva clave para cambiarla...':'Escribí la clave para el diseñador...'}" style="font-size:12px">
+    <button class="b p" type="button" id="btnSaveDesPwCard" style="white-space:nowrap;padding:5px 12px">Guardar Clave</button>
+   </div>
+  </div>`:''}
+
   <div class="f">
    <label>📁 Proyectos a cargo (marcar para asignar):</label>
    <div style="display:flex;flex-direction:column;gap:5px;max-height:140px;overflow-y:auto;padding:2px 0">
@@ -1028,6 +1043,15 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   if(m.querySelector('#esup_loc'))m.querySelector('#esup_loc').value=s.location||'';
   if(m.querySelector('#esup_notes'))m.querySelector('#esup_notes').value=s.notes||'';
   c.supplierId=s.id;c.isSupplier=true;
+ });
+ m.querySelector('#btnSaveDesPwCard')?.addEventListener('click',async()=>{
+  const pw=m.querySelector('#edes_pw').value.trim();
+  if(!pw)return toast('Ingresá una clave para el diseñador.','err');
+  try{
+   await setDesignerPassword(pw);
+   toast('✅ Clave de diseñador guardada correctamente.');
+   closeM();editCard(id);
+  }catch(x){toast(x.message,'err')}
  });
  m.querySelector('#ebud')?.addEventListener('click',()=>{m.querySelector('#ok').click();budgetModal(id)});
  m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
