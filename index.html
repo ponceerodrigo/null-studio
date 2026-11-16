@@ -309,7 +309,7 @@ function bdef(d){return{num:nextNum(d),clientName:'',clientCuit:'',condIva:'Cons
 
 /* ---------- Acceso ---------- */
 let isNew=!LS.getItem(VK);
-$('#gp').textContent=isNew?'Primera vez: creá tu Clave Secreta de Administrador. Con ella tendrás control total del estudio y podrás crear claves para diseñadores.':'Ingresá tu clave (Administrador o Diseñador):';
+$('#gp').textContent=isNew?'Creá tu clave de Administrador para comenzar:':'Ingresá tu clave:';
 $('#gk2').hidden=!isNew;$('#gk2').required=isNew;$('#gb').textContent=isNew?'Crear clave y entrar':'Entrar';
 if(!crypto.subtle)$('#gerr').textContent='Este navegador necesita HTTPS (o localhost) para cifrar.';
 $('#gcl').onclick=()=>{const w=$('#gcw');w.hidden=!w.hidden;const c=CL();if(c){$('#gu').value=c.url;$('#gak').value=c.key}};
@@ -1141,17 +1141,15 @@ function accessModal(){
    <span class="role-badge admin" style="font-size:11px">Activa</span>
   </div>
   <p style="font-size:12px;color:var(--mu);margin:0 0 8px">Con esta clave entrás en modo administrador con acceso total a proyectos secretos, finanzas y control de permisos.</p>
-  <details>
-   <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--ac)">Cambiar mi contraseña de Administrador</summary>
-   <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
-    <input type="password" id="mCurAdminPw" placeholder="Contraseña de Administrador actual">
-    <div class="row">
-     <input type="password" id="mNewAdminPw" placeholder="Nueva contraseña (mínimo 6 caracteres)">
-     <input type="password" id="mNewAdminPw2" placeholder="Repetir nueva contraseña">
-    </div>
-    <button class="b p" id="btnChgAdminPw" style="align-self:flex-start;margin-top:4px">Actualizar Clave de Administrador</button>
+  <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--ln);display:flex;flex-direction:column;gap:8px">
+   <b style="font-size:13px;color:var(--tx)">🔑 Cambiar mi contraseña maestra de Administrador:</b>
+   <input type="password" id="mCurAdminPw" placeholder="Ingresá tu contraseña de Administrador actual">
+   <div class="row">
+    <input type="password" id="mNewAdminPw" placeholder="Nueva contraseña maestra (mínimo 6 caracteres)">
+    <input type="password" id="mNewAdminPw2" placeholder="Repetir nueva contraseña maestra">
    </div>
-  </details>
+   <button class="b p" id="btnChgAdminPw" style="align-self:flex-start">Guardar Nueva Clave Maestra</button>
+  </div>
  </div>
 
  <div class="box" style="background:var(--cd);border-left:4px solid #059669;margin-bottom:12px">
