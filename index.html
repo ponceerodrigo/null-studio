@@ -61,39 +61,51 @@ main{padding:16px 18px}
 .bf-sec textarea{resize:vertical;min-height:60px;font-size:12.5px;line-height:1.4;background:var(--pn);border:1px solid var(--ln);padding:6px 8px}
 .bf-extra-head{display:flex;align-items:center;gap:6px}
 .bf-extra-head input{font-size:12px;font-weight:700;padding:4px 7px;background:var(--pn)}
-.board{display:flex;gap:14px;padding-bottom:20px;transition:all .15s}
-.board.layout-row{overflow-x:auto;align-items:flex-start}
-.board.layout-grid{flex-wrap:wrap;overflow-x:visible;align-items:flex-start}
-.board.layout-grid.grid-cols-2 .col{width:calc(50% - 8px);min-width:290px}
-.board.layout-grid.grid-cols-3 .col{width:calc(33.333% - 11px);min-width:280px}
-.board.layout-grid.grid-cols-4 .col{width:calc(25% - 12px);min-width:260px}
-.board.layout-grid.grid-cols-auto .col{width:320px;min-width:290px;max-width:380px}
-.board.layout-grid .col{max-height:560px}
-.board.layout-grid .addcol{height:70px;min-height:70px;display:flex;align-items:center;justify-content:center}
-@media(max-width:980px){
-  .board.layout-grid.grid-cols-3 .col,
-  .board.layout-grid.grid-cols-4 .col{width:calc(50% - 8px)}
+.board{padding-bottom:20px;transition:all .15s}
+.board.layout-row{display:flex;gap:10px;overflow-x:auto;align-items:flex-start}
+.board.layout-row .col{width:270px;min-width:250px;max-height:calc(100vh - 120px)}
+.board.layout-grid{display:grid;gap:10px;width:100%;align-items:start;overflow-x:visible}
+.board.layout-grid.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}
+.board.layout-grid.grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}
+.board.layout-grid.grid-cols-4{grid-template-columns:repeat(4, minmax(0, 1fr))}
+.board.layout-grid.grid-cols-5{grid-template-columns:repeat(5, minmax(0, 1fr))}
+.board.layout-grid.grid-cols-auto{grid-template-columns:repeat(auto-fill, minmax(250px, 1fr))}
+.board.layout-grid .col{width:100%!important;min-width:0!important;max-width:100%!important;max-height:430px}
+.board.layout-grid .addcol{height:54px;min-height:54px;display:flex;align-items:center;justify-content:center;width:100%}
+@media(max-width:1100px){
+  .board.layout-grid.grid-cols-4, .board.layout-grid.grid-cols-5{grid-template-columns:repeat(3, minmax(0, 1fr))}
 }
-@media(max-width:640px){
-  .board.layout-grid .col{width:100%!important;min-width:0}
+@media(max-width:850px){
+  .board.layout-grid.grid-cols-3, .board.layout-grid.grid-cols-4, .board.layout-grid.grid-cols-5{grid-template-columns:repeat(2, minmax(0, 1fr))}
 }
-.col{background:var(--pn);border:1px solid var(--ln);border-radius:var(--r);width:310px;min-width:300px;padding:8px;display:flex;flex-direction:column;max-height:calc(100vh - 130px);transition:transform .15s,box-shadow .15s,outline .15s}
+@media(max-width:580px){
+  .board.layout-grid{grid-template-columns:1fr!important}
+}
+.col{background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s,outline .15s}
 .col.col-dragging{opacity:.35;border:2px dashed var(--ac)!important}
-.col.col-over{outline:3px solid var(--ac);outline-offset:2px;transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.18)}
-.col-drag{cursor:grab;font-size:15px;color:var(--mu);padding:1px 3px;user-select:none;border-radius:3px;display:inline-flex;align-items:center}
+.col.col-over{outline:3px solid var(--ac)!important;outline-offset:2px!important;transform:scale(1.02);box-shadow:0 8px 24px rgba(0,0,0,.25)!important}
+.col.col-spacer{background:transparent;border:1px dashed var(--ln);min-height:60px}
+.col.col-spacer:hover{border-color:var(--ac)}
+.col-drag{cursor:grab;font-size:14px;color:var(--mu);padding:0 3px;user-select:none;border-radius:3px;display:inline-flex;align-items:center}
 .col-drag:hover{background:var(--ln);color:var(--tx)}
 .col-drag:active{cursor:grabbing}
-.col header{display:flex;align-items:center;gap:3px;padding:2px 2px 8px}
-.col header input{border-color:transparent;background:none;font-weight:700;padding:3px 5px;flex:1;min-width:60px}.col header input:focus{background:var(--cd);border-color:var(--ac)}
-.n{color:var(--mu);font-size:12px;margin:0 2px}
-.cl{overflow-y:auto;min-height:24px;padding:2px;flex:1}.cl.over{outline:2px dashed var(--ac);outline-offset:-2px}
-.cd{background:var(--cd);border:1px solid var(--ln);border-left:4px solid var(--ac);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:transform .15s,border-color .15s}
+.col header{display:flex;align-items:center;gap:2px;padding:1px 1px 6px}
+.col header input{border-color:transparent;background:none;font-weight:700;font-size:12.5px;padding:2px 4px;flex:1;min-width:40px}
+.col header input:focus{background:var(--cd);border-color:var(--ac)}
+.col header .ib{padding:1px 3px;font-size:11px;line-height:1;border-radius:3px}
+.col-slot{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--cd);border:1px solid var(--ln);color:var(--mu);margin-right:2px;white-space:nowrap}
+.n{color:var(--mu);font-size:11px;margin:0 2px;font-weight:600}
+.cl{overflow-y:auto;min-height:20px;max-height:280px;padding:2px;flex:1;scrollbar-width:thin}
+.cl.over{outline:2px dashed var(--ac);outline-offset:-2px}
+.cd{background:var(--cd);border:1px solid var(--ln);border-left:3px solid var(--ac);border-radius:5px;padding:5px 8px;margin-bottom:5px;cursor:pointer;font-size:11.5px;transition:transform .12s,border-color .12s}
 .cd:hover{transform:translateY(-1px);border-color:var(--ac)}.cd.drag{opacity:.35}.cd.cc{color:#12171c}
-.cd .t{display:flex;justify-content:space-between;gap:6px;font-weight:600}
-.cd .m{font-size:12px;color:var(--mu);margin-top:4px}.cd.cc .m{color:#3b444d}
-.add,.addcol{border:0;background:none;color:var(--mu);text-align:left;padding:8px;border-radius:var(--r);font-weight:600}
+.cd .t{display:flex;justify-content:space-between;align-items:center;gap:4px;font-weight:600;font-size:12px;line-height:1.25}
+.cd .m{font-size:10.5px;color:var(--mu);margin-top:2px;line-height:1.25}.cd.cc .m{color:#3b444d}
+.cd .ib{padding:1px 2px;font-size:10.5px}
+.add,.addcol{border:0;background:none;color:var(--mu);text-align:left;padding:5px 6px;border-radius:4px;font-weight:600;font-size:11.5px}
 .add:hover{background:var(--ln);color:var(--tx)}
-.addcol{min-width:260px;border:2px dashed var(--ln);text-align:center;color:var(--tx)}.addcol:hover{border-color:var(--ac)}
+.addcol{min-width:180px;border:2px dashed var(--ln);text-align:center;color:var(--tx);padding:8px}
+.addcol:hover{border-color:var(--ac)}
 .list-type-cards{display:flex;flex-direction:column;gap:8px}
 .lt-card{display:flex;align-items:center;gap:12px;background:var(--cd);border:2px solid var(--ln);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color .15s,background .15s}
 .lt-card:hover{border-color:var(--ac)}
@@ -489,6 +501,7 @@ function getColType(l){
  const t=(l.title||'').toLowerCase();
  if(t.includes('proveed'))return'suppliers';
  if(t.includes('diseñ'))return'designers';
+ if(t.includes('espacio')||t.includes('separador'))return'spacer';
  return'projects';
 }
 function isSuppCol(l){return getColType(l)==='suppliers'}
@@ -496,6 +509,14 @@ function isSupplierCard(c,l){return!!(c&&(c.isSupplier||(l&&isSuppCol(l))))}
 function isDesCol(l){return getColType(l)==='designers'}
 function isDesignerCard(c,l){return!!(c&&(c.isDesigner||(l&&isDesCol(l))))}
 function isProjCol(l){return getColType(l)==='projects'}
+function isSpacerCol(l){return getColType(l)==='spacer'}
+function getGridColsCount(){
+ if(GRID_COLS==='2')return 2;
+ if(GRID_COLS==='3')return 3;
+ if(GRID_COLS==='4')return 4;
+ if(GRID_COLS==='5')return 5;
+ return 3;
+}
 
 function getGlobalSuppliers(){
  const list=[];
@@ -593,38 +614,73 @@ function render(){
  const layoutControls=(!F&&VIEW==='board')?`<div style="display:inline-flex;align-items:center;gap:3px;margin-left:10px;background:var(--cd);padding:2px 4px;border:1px solid var(--ln);border-radius:var(--r)">
   <button class="b ${BOARD_LAYOUT==='grid'?'on':''}" data-act="setLayout" data-lay="grid" title="Vista en Cuadrícula" style="padding:3px 8px;font-size:12px">⊞ Cuadrícula</button>
   <button class="b ${BOARD_LAYOUT==='row'?'on':''}" data-act="setLayout" data-lay="row" title="Vista Horizontal (una fila)" style="padding:3px 8px;font-size:12px">↔ Horizontal</button>
-  ${BOARD_LAYOUT==='grid'?`<select id="selGridCols" style="width:auto;padding:2px 5px;font-size:11px;font-weight:600;border:0;background:transparent;cursor:pointer" title="Columnas por fila">
+  ${BOARD_LAYOUT==='grid'?`<select id="selGridCols" style="width:auto;padding:2px 5px;font-size:11px;font-weight:600;border:0;background:transparent;cursor:pointer" title="Columnas por fila en la cuadrícula">
+   <option value="2" ${GRID_COLS==='2'?'selected':''}>2 columnas</option>
+   <option value="3" ${GRID_COLS==='3'?'selected':''}>3 columnas</option>
+   <option value="4" ${GRID_COLS==='4'?'selected':''}>4 columnas</option>
+   <option value="5" ${GRID_COLS==='5'?'selected':''}>5 columnas</option>
    <option value="auto" ${GRID_COLS==='auto'?'selected':''}>Auto</option>
-   <option value="2" ${GRID_COLS==='2'?'selected':''}>2 cols</option>
-   <option value="3" ${GRID_COLS==='3'?'selected':''}>3 cols</option>
-   <option value="4" ${GRID_COLS==='4'?'selected':''}>4 cols</option>
   </select>`:''}</div>`:'';
  $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(curProj.title)}</span>${desBadge}${budBtn}`
   :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>${layoutControls}`;
  const m=$('#main');
  if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
   <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
- const boardClass=BOARD_LAYOUT==='grid'?`layout-grid grid-cols-${GRID_COLS}`:'layout-row';
- m.innerHTML=`<div class="board ${boardClass}">${cur().filter(isColVisible).map((l, colIdx, colArr)=>{
+ const isGrid=BOARD_LAYOUT==='grid';
+ const colsPerRow=getGridColsCount();
+ const boardClass=isGrid?`layout-grid grid-cols-${GRID_COLS}`:'layout-row';
+ const visibleCols=cur().filter(isColVisible);
+ m.innerHTML=`<div class="board ${boardClass}">${visibleCols.map((l, colIdx, colArr)=>{
+  const isSpacer=isSpacerCol(l);
   const isSup=isSuppCol(l);
   const isDes=isDesCol(l);
   const isColSec=!!l.isSecret;
   const cards=(l.cards||[]).filter(c=>isCardVisible(c,l));
-  const typeIcon=isDes?'🎨':(isSup?'🏭':'📁');
-  const typeName=isDes?'Diseñadores':(isSup?'Proveedores':'Proyectos');
-  const secColBtn=ROLE==='admin'?`<button class="ib" data-act="quickColSecret" data-l="${l.id}" title="${isColSec?'Lista Secreta (oculta para diseñadores). Clic para hacerla visible.':'Lista Visible. Clic para hacerla secreta.'}">${isColSec?'🔒':'👁️'}</button>`:'';
-  const moveLeftBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="-1" title="Mover placa a la izquierda / arriba" ${colIdx===0?'disabled style="opacity:.25;cursor:default"':''}>◀</button>`;
-  const moveRightBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="1" title="Mover placa a la derecha / abajo" ${colIdx===colArr.length-1?'disabled style="opacity:.25;cursor:default"':''}>▶</button>`;
-  const optBtn=`<button class="ib" data-act="colOptions" data-l="${l.id}" title="Opciones de placa (${typeName})">⚙️</button>`;
+  const typeIcon=isSpacer?'⬜':(isDes?'🎨':(isSup?'🏭':'📁'));
+  const typeName=isSpacer?'Espacio vacío':(isDes?'Diseñadores':(isSup?'Proveedores':'Proyectos'));
+  
+  const slotNum=colIdx+1;
+  const rowNum=Math.floor(colIdx/colsPerRow)+1;
+  const colNum=(colIdx%colsPerRow)+1;
+  const slotBadge=`<span class="col-slot" title="Casillero #${slotNum} · Fila ${rowNum}, Col ${colNum}">#${slotNum}</span>`;
+
+  const canMoveLeft=colIdx>0;
+  const canMoveRight=colIdx<colArr.length-1;
+  const canMoveUp=isGrid&&colIdx>=colsPerRow;
+  const canMoveDown=isGrid&&(colIdx+colsPerRow<colArr.length);
+
+  const moveLeftBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="-1" title="Mover a la izquierda (-1)" ${!canMoveLeft?'disabled style="opacity:.2;cursor:default"':''}>◀</button>`;
+  const moveRightBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="1" title="Mover a la derecha (+1)" ${!canMoveRight?'disabled style="opacity:.2;cursor:default"':''}>▶</button>`;
+  const moveUpBtn=isGrid?`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="-${colsPerRow}" title="Subir una fila en cuadrícula (-${colsPerRow})" ${!canMoveUp?'disabled style="opacity:.2;cursor:default"':''}>▲</button>`:'';
+  const moveDownBtn=isGrid?`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="${colsPerRow}" title="Bajar una fila en cuadrícula (+${colsPerRow})" ${!canMoveDown?'disabled style="opacity:.2;cursor:default"':''}>▼</button>`:'';
+
+  const secColBtn=ROLE==='admin'&&!isSpacer?`<button class="ib" data-act="quickColSecret" data-l="${l.id}" title="${isColSec?'Lista Secreta (oculta para diseñadores). Clic para hacerla visible.':'Lista Visible. Clic para hacerla secreta.'}">${isColSec?'🔒':'👁️'}</button>`:'';
+  const optBtn=`<button class="ib" data-act="colOptions" data-l="${l.id}" title="Opciones y posición en cuadrícula (Placa #${slotNum})">⚙️</button>`;
+  const delBtn=ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar ${isSpacer?'espacio libre':'lista'}">✕</button>`:'';
+
+  if(isSpacer){
+   return `<section class="col col-spacer" data-col-id="${l.id}">
+   <header>
+    <span class="col-drag" draggable="true" data-coldrag="${l.id}" title="Arrastrar espacio vacío para ubicarlo">⠿</span>
+    ${slotBadge}
+    <span style="font-size:11.5px;color:var(--mu);font-weight:600;flex:1">⬜ Espacio libre</span>
+    ${moveLeftBtn}${moveUpBtn}${moveDownBtn}${moveRightBtn}${optBtn}${delBtn}
+   </header>
+   <div style="flex:1;min-height:50px;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:11px;border:1px dashed var(--ln);border-radius:4px;margin:3px 1px">
+    Espacio vacío (#${slotNum})
+   </div>
+  </section>`;
+  }
+
   return `<section class="col ${isColSec?'is-secret':''}" data-col-id="${l.id}">
   <header>
    <span class="col-drag" draggable="true" data-coldrag="${l.id}" title="Arrastrar para mover placa en la cuadrícula">⠿</span>
-   <span title="Tipo de lista: ${typeName}" style="font-size:13px;cursor:pointer" data-act="colOptions" data-l="${l.id}">${typeIcon}</span>
+   ${slotBadge}
+   <span title="Tipo de lista: ${typeName}" style="font-size:12px;cursor:pointer" data-act="colOptions" data-l="${l.id}">${typeIcon}</span>
    <input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista">
-   ${isColSec?'<span class="badge-sec" style="font-size:10px">🔒</span>':''}
+   ${isColSec?'<span class="badge-sec" style="font-size:9.5px;padding:1px 4px">🔒</span>':''}
    <span class="n">${cards.length}</span>
-   ${moveLeftBtn}${moveRightBtn}${secColBtn}${optBtn}
-   ${ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button>`:''}
+   ${moveLeftBtn}${moveUpBtn}${moveDownBtn}${moveRightBtn}${secColBtn}${optBtn}${delBtn}
   </header>
   <div class="cl" data-drop="${l.id}">${cards.map(cardHTML).join('')}</div>
   <div style="display:flex;gap:4px">
@@ -860,15 +916,17 @@ const A={
  lock(){flush().then(()=>{S=KEY=VID=RAW_VMK=VAULT_KEYS=null;ROLE='admin';$('#app').hidden=true;$('#gate').hidden=false;$('#gk').value='';$('#gk').focus();toast('Sesión cerrada.')})},
  addList(){addListModal()},
  moveCol(a){
-  const lid=a.dataset.l,dir=+a.dataset.dir;
+  const lid=a.dataset.l, dir=+a.dataset.dir;
   const list=cur();
   const idx=list.findIndex(c=>c.id===lid);
   if(idx<0)return;
-  const targetIdx=idx+dir;
-  if(targetIdx<0||targetIdx>=list.length)return;
+  let targetIdx=idx+dir;
+  if(targetIdx<0) targetIdx=0;
+  if(targetIdx>=list.length) targetIdx=list.length-1;
+  if(targetIdx===idx) return;
   const item=list.splice(idx,1)[0];
   list.splice(targetIdx,0,item);
-  save();render();
+  save();render();toast(`Placa «${item.title}» colocada en casillero #${targetIdx+1}.`);
  },
  colOptions(a){colOptionsModal(a.dataset.l)},
  setLayout(a){
@@ -1038,6 +1096,11 @@ function addListModal(){
     <div class="lt-icon">🎨</div>
     <div class="lt-info"><b>Diseñadores</b><small>Equipo de diseño: roles, software, asignación de proyectos y control de disponibilidad.</small></div>
    </label>
+   <label class="lt-card">
+    <input type="radio" name="newColType" value="spacer" hidden>
+    <div class="lt-icon">⬜</div>
+    <div class="lt-info"><b>Espacio vacío (Separador)</b><small>Deja un casillero libre en la cuadrícula para separar bloques o acomodar placas a gusto.</small></div>
+   </label>
   </div>`;
 
  const m=modal(`<h3>➕ Añadir Nueva Lista</h3>
@@ -1072,13 +1135,16 @@ function addListModal(){
  });
 
  const submit=()=>{
-  const title=m.querySelector('#newColTitle').value.trim();
-  if(!title)return toast('Ingresá un nombre para la lista.','err');
   const type=m.querySelector('input[name="newColType"]:checked')?.value||'projects';
+  let title=m.querySelector('#newColTitle').value.trim();
+  if(!title){
+   if(type==='spacer') title='Espacio libre';
+   else return toast('Ingresá un nombre para la lista.','err');
+  }
   const isSecret=m.querySelector('#newColSec')?.checked||false;
   cur().push({id:uid('l'),title,type,isSecret,cards:[]});
   save();closeM();render();
-  const label=type==='suppliers'?'Proveedores 🏭':(type==='designers'?'Diseñadores 🎨':'Proyectos 📁');
+  const label=type==='suppliers'?'Proveedores 🏭':(type==='designers'?'Diseñadores 🎨':(type==='spacer'?'Espacio vacío ⬜':'Proyectos 📁'));
   toast(`Lista «${title}» creada como ${label}.`);
  };
 
@@ -1092,6 +1158,20 @@ function colOptionsModal(lid){
  if(!l)return;
  const curType=getColType(l);
  const isInsideProject=!!F;
+ const isGrid=BOARD_LAYOUT==='grid';
+ const colsPerRow=getGridColsCount();
+ const list=cur();
+ const curIdx=list.indexOf(l);
+ const colsCount=list.length;
+
+ let slotButtons='';
+ for(let i=0;i<colsCount;i++){
+  const isCur=i===curIdx;
+  const rN=Math.floor(i/colsPerRow)+1;
+  const cN=(i%colsPerRow)+1;
+  slotButtons+=`<button type="button" class="b ${isCur?'p':''}" data-slot="${i}" style="padding:3px 7px;font-size:11px;min-width:32px" title="Casillero #${i+1} · Fila ${rN}, Col ${cN}">#${i+1}${isCur?' 📍':''}</button>`;
+ }
+
  const typeCards=isInsideProject?`
   <div class="list-type-cards">
    <label class="lt-card ${curType==='projects'?'selected':''}">
@@ -1121,40 +1201,52 @@ function colOptionsModal(lid){
     <div class="lt-icon">🎨</div>
     <div class="lt-info"><b>Diseñadores</b><small>Equipo de diseño: roles, software, asignación de proyectos y control de disponibilidad.</small></div>
    </label>
+   <label class="lt-card ${curType==='spacer'?'selected':''}">
+    <input type="radio" name="optColType" value="spacer" ${curType==='spacer'?'checked':''} hidden>
+    <div class="lt-icon">⬜</div>
+    <div class="lt-info"><b>Espacio vacío (Separador)</b><small>Casillero en blanco para dejar huecos libres en la cuadrícula y acomodar placas.</small></div>
+   </label>
   </div>`;
 
- const m=modal(`<h3>⚙️ Opciones de Lista · ${esc(l.title)}</h3>
+ const m=modal(`<h3>⚙️ Opciones y Ubicación de Placa · ${esc(l.title)}</h3>
   <div class="f">
    <label>Nombre de la lista:</label>
    <input id="optColTitle" value="${esc(l.title)}">
   </div>
-  <div class="f" style="margin-top:10px">
+  <div class="f" style="margin-top:8px">
    <label>Tipo de lista y normas aplicadas:</label>
    ${typeCards}
   </div>
   ${ROLE==='admin'?`
-  <div class="f" style="margin-top:10px">
+  <div class="f" style="margin-top:8px">
    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600">
     <input type="checkbox" id="optColSec" ${l.isSecret?'checked':''} style="width:auto">
     <span>🔒 Lista Secreta (oculta para diseñadores)</span>
    </label>
   </div>`:''}
-  <div class="f" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--ln)">
-   <label>Mover posición de la placa en la cuadrícula:</label>
-   <div style="display:flex;gap:6px">
-    <button class="b" type="button" id="btnMoveFirst" style="flex:1">⏮ Al inicio</button>
-    <button class="b" type="button" id="btnMoveLeft" style="flex:1">◀ Hacia atrás</button>
-    <button class="b" type="button" id="btnMoveRight" style="flex:1">▶ Hacia adelante</button>
-    <button class="b" type="button" id="btnMoveLast" style="flex:1">⏭ Al final</button>
+  <div class="f" style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--ln)">
+   <label>📍 Ubicación en la cuadrícula (Casillero actual: #${curIdx+1}):</label>
+   <p class="hint" style="margin:2px 0 6px">Tocá un casillero para colocar esta placa exactamente en esa posición:</p>
+   <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+    ${slotButtons}
+   </div>
+   <div style="display:flex;gap:4px;flex-wrap:wrap">
+    <button class="b" type="button" id="btnMoveFirst" style="flex:1;font-size:11px">⏮ Inicio (#1)</button>
+    <button class="b" type="button" id="btnMoveLeft" style="flex:1;font-size:11px">◀ Izq (-1)</button>
+    ${isGrid?`
+    <button class="b" type="button" id="btnMoveUp" style="flex:1;font-size:11px">▲ Subir (-${colsPerRow})</button>
+    <button class="b" type="button" id="btnMoveDown" style="flex:1;font-size:11px">▼ Bajar (+${colsPerRow})</button>`:''}
+    <button class="b" type="button" id="btnMoveRight" style="flex:1;font-size:11px">▶ Der (+1)</button>
+    <button class="b" type="button" id="btnMoveLast" style="flex:1;font-size:11px">⏭ Final (#${colsCount})</button>
    </div>
   </div>
-  <div class="acts" style="display:flex;justify-content:space-between;align-items:center">
+  <div class="acts" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
    ${ROLE==='admin'||F?`<button class="b d" type="button" id="btnDelColModal">Eliminar lista</button>`:'<div></div>'}
    <div style="display:flex;gap:8px">
     <button class="b" data-act="closeM">Cancelar</button>
     <button class="b p" id="btnSaveColOpt">Guardar Cambios</button>
    </div>
-  </div>`,'540px');
+  </div>`,'520px');
 
  const cards=m.querySelectorAll('.lt-card');
  cards.forEach(c=>{
@@ -1165,10 +1257,21 @@ function colOptionsModal(lid){
   };
  });
 
- const list=cur();
+ m.querySelectorAll('[data-slot]').forEach(btn=>{
+  btn.onclick=()=>{
+   const targetIdx=+btn.dataset.slot;
+   if(targetIdx!==curIdx){
+    list.splice(curIdx,1);
+    list.splice(targetIdx,0,l);
+    save();render();closeM();
+    toast(`Placa «${l.title}» ubicada en casillero #${targetIdx+1}.`);
+   }
+  };
+ });
+
  m.querySelector('#btnMoveFirst').onclick=()=>{
   const idx=list.indexOf(l);
-  if(idx>0){list.splice(idx,1);list.unshift(l);save();render();closeM();toast(`Placa «${l.title}» movida al inicio.`);}
+  if(idx>0){list.splice(idx,1);list.unshift(l);save();render();closeM();toast(`Placa «${l.title}» movida al casillero #1.`);}
  };
  m.querySelector('#btnMoveLast').onclick=()=>{
   const idx=list.indexOf(l);
@@ -1176,12 +1279,28 @@ function colOptionsModal(lid){
  };
  m.querySelector('#btnMoveLeft').onclick=()=>{
   const idx=list.indexOf(l);
-  if(idx>0){list.splice(idx,1);list.splice(idx-1,0,l);save();render();closeM();}
+  if(idx>0){list.splice(idx,1);list.splice(idx-1,0,l);save();render();closeM();toast(`Placa «${l.title}» movida al casillero #${idx}.`);}
  };
  m.querySelector('#btnMoveRight').onclick=()=>{
   const idx=list.indexOf(l);
-  if(idx<list.length-1){list.splice(idx,1);list.splice(idx+1,0,l);save();render();closeM();}
+  if(idx<list.length-1){list.splice(idx,1);list.splice(idx+1,0,l);save();render();closeM();toast(`Placa «${l.title}» movida al casillero #${idx+2}.`);}
  };
+ const bUp=m.querySelector('#btnMoveUp');
+ if(bUp){
+  bUp.onclick=()=>{
+   const idx=list.indexOf(l);
+   const targetIdx=Math.max(0,idx-colsPerRow);
+   if(targetIdx!==idx){list.splice(idx,1);list.splice(targetIdx,0,l);save();render();closeM();toast(`Placa «${l.title}» subida de fila.`);}
+  };
+ }
+ const bDown=m.querySelector('#btnMoveDown');
+ if(bDown){
+  bDown.onclick=()=>{
+   const idx=list.indexOf(l);
+   const targetIdx=Math.min(list.length-1,idx+colsPerRow);
+   if(targetIdx!==idx){list.splice(idx,1);list.splice(targetIdx,0,l);save();render();closeM();toast(`Placa «${l.title}» bajada de fila.`);}
+  };
+ }
  m.querySelector('#btnDelColModal')?.addEventListener('click',()=>{
   closeM();
   A.delList({dataset:{l:l.id}});
@@ -1196,10 +1315,10 @@ function colOptionsModal(lid){
   (l.cards||[]).forEach(c=>{
    if(newType==='suppliers'){c.isSupplier=true;c.isDesigner=false;}
    else if(newType==='designers'){c.isDesigner=true;c.isSupplier=false;}
-   else{c.isSupplier=false;c.isDesigner=false;if(!c.folderColumns)c.folderColumns=[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];}
+   else if(newType==='projects'){c.isSupplier=false;c.isDesigner=false;if(!c.folderColumns)c.folderColumns=[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];}
   });
   save();closeM();render();
-  toast(`Placa actualizada como «${newT}».`);
+  toast(`Placa actualizada como ${newType}.`);
  };
 }
 
