@@ -145,8 +145,11 @@ td input{border:0;padding:4px;background:none}td.r{text-align:right;white-space:
 <body>
 <div id="gate"><form id="gf" autocomplete="off">
 <h2>NULL <b>Studio</b></h2><p id="gp"></p>
-<input type="password" id="gk" placeholder="Clave" autocomplete="current-password" required>
-<input type="password" id="gk2" placeholder="Repetir clave" hidden>
+<div style="position:relative;display:flex;align-items:center;width:100%">
+ <input type="password" id="gk" placeholder="Clave de acceso" autocomplete="current-password" required style="padding-right:38px">
+ <button type="button" id="btnTogglePw" title="Mostrar / ocultar contraseña" style="position:absolute;right:8px;background:none;border:0;color:var(--mu);cursor:pointer;font-size:16px;padding:2px;line-height:1">👁️</button>
+</div>
+<input type="password" id="gk2" placeholder="Repetir clave" hidden style="margin-top:8px">
 <div id="gcw" hidden style="margin-top:10px"><input id="gu" placeholder="Project URL (https://xxxx.supabase.co)"><input id="gak" placeholder="Clave anon / publishable" style="margin-top:6px"></div>
 <button type="button" class="b" id="gcl">☁️ Usar datos de la nube</button>
 <button class="b p" id="gb">Entrar</button><div id="gerr" role="alert"></div>
@@ -350,6 +353,15 @@ if (LS.getItem('nl_seed_sig') !== SEED_SIG) {
 let isNew=!LS.getItem(VK)&&!SEED_VAULT;
 $('#gp').textContent='Ingresá tu clave:';
 $('#gk2').hidden=true;$('#gk2').required=false;$('#gb').textContent='Entrar';
+const btnTogglePw=$('#btnTogglePw');
+if(btnTogglePw){
+ btnTogglePw.onclick=()=>{
+  const inp=$('#gk');
+  if(inp.type==='password'){inp.type='text';btnTogglePw.textContent='🙈';btnTogglePw.title='Ocultar contraseña';}
+  else{inp.type='password';btnTogglePw.textContent='👁️';btnTogglePw.title='Mostrar contraseña';}
+  inp.focus();
+ };
+}
 if(!crypto.subtle)$('#gerr').textContent='Este navegador necesita HTTPS (o localhost) para cifrar.';
 $('#gcl').onclick=()=>{const w=$('#gcw');w.hidden=!w.hidden;const c=CL();if(c){$('#gu').value=c.url;$('#gak').value=c.key}};
 $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#gerr');err.textContent='';$('#gb').disabled=true;
@@ -410,7 +422,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
        }
       }
      }
-     if(!unwrapped)throw new Error('Clave incorrecta.');
+     if(!unwrapped)throw new Error('Clave incorrecta. Recordá que la clave de admin es rodrizzero (10 letras). Usá el 👁️ para verificar lo que escribís.');
      RAW_VMK=unwrapped;
      KEY=await importVMK(RAW_VMK);
      VAULT_KEYS=box.keys;
