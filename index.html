@@ -61,11 +61,31 @@ main{padding:16px 18px}
 .bf-sec textarea{resize:vertical;min-height:60px;font-size:12.5px;line-height:1.4;background:var(--pn);border:1px solid var(--ln);padding:6px 8px}
 .bf-extra-head{display:flex;align-items:center;gap:6px}
 .bf-extra-head input{font-size:12px;font-weight:700;padding:4px 7px;background:var(--pn)}
-.board{display:flex;gap:14px;overflow-x:auto;align-items:flex-start;padding-bottom:16px}
-.col{background:var(--pn);border:1px solid var(--ln);border-radius:var(--r);width:300px;min-width:300px;padding:8px;display:flex;flex-direction:column;max-height:calc(100vh - 130px)}
-.col header{display:flex;align-items:center;gap:4px;padding:2px 2px 8px}
-.col header input{border-color:transparent;background:none;font-weight:700;padding:3px 5px}.col header input:focus{background:var(--cd);border-color:var(--ac)}
-.n{color:var(--mu);font-size:12px}
+.board{display:flex;gap:14px;padding-bottom:20px;transition:all .15s}
+.board.layout-row{overflow-x:auto;align-items:flex-start}
+.board.layout-grid{flex-wrap:wrap;overflow-x:visible;align-items:flex-start}
+.board.layout-grid.grid-cols-2 .col{width:calc(50% - 8px);min-width:290px}
+.board.layout-grid.grid-cols-3 .col{width:calc(33.333% - 11px);min-width:280px}
+.board.layout-grid.grid-cols-4 .col{width:calc(25% - 12px);min-width:260px}
+.board.layout-grid.grid-cols-auto .col{width:320px;min-width:290px;max-width:380px}
+.board.layout-grid .col{max-height:560px}
+.board.layout-grid .addcol{height:70px;min-height:70px;display:flex;align-items:center;justify-content:center}
+@media(max-width:980px){
+  .board.layout-grid.grid-cols-3 .col,
+  .board.layout-grid.grid-cols-4 .col{width:calc(50% - 8px)}
+}
+@media(max-width:640px){
+  .board.layout-grid .col{width:100%!important;min-width:0}
+}
+.col{background:var(--pn);border:1px solid var(--ln);border-radius:var(--r);width:310px;min-width:300px;padding:8px;display:flex;flex-direction:column;max-height:calc(100vh - 130px);transition:transform .15s,box-shadow .15s,outline .15s}
+.col.col-dragging{opacity:.35;border:2px dashed var(--ac)!important}
+.col.col-over{outline:3px solid var(--ac);outline-offset:2px;transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.col-drag{cursor:grab;font-size:15px;color:var(--mu);padding:1px 3px;user-select:none;border-radius:3px;display:inline-flex;align-items:center}
+.col-drag:hover{background:var(--ln);color:var(--tx)}
+.col-drag:active{cursor:grabbing}
+.col header{display:flex;align-items:center;gap:3px;padding:2px 2px 8px}
+.col header input{border-color:transparent;background:none;font-weight:700;padding:3px 5px;flex:1;min-width:60px}.col header input:focus{background:var(--cd);border-color:var(--ac)}
+.n{color:var(--mu);font-size:12px;margin:0 2px}
 .cl{overflow-y:auto;min-height:24px;padding:2px;flex:1}.cl.over{outline:2px dashed var(--ac);outline-offset:-2px}
 .cd{background:var(--cd);border:1px solid var(--ln);border-left:4px solid var(--ac);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:transform .15s,border-color .15s}
 .cd:hover{transform:translateY(-1px);border-color:var(--ac)}.cd.drag{opacity:.35}.cd.cc{color:#12171c}
@@ -74,6 +94,15 @@ main{padding:16px 18px}
 .add,.addcol{border:0;background:none;color:var(--mu);text-align:left;padding:8px;border-radius:var(--r);font-weight:600}
 .add:hover{background:var(--ln);color:var(--tx)}
 .addcol{min-width:260px;border:2px dashed var(--ln);text-align:center;color:var(--tx)}.addcol:hover{border-color:var(--ac)}
+.list-type-cards{display:flex;flex-direction:column;gap:8px}
+.lt-card{display:flex;align-items:center;gap:12px;background:var(--cd);border:2px solid var(--ln);border-radius:var(--r);padding:10px 14px;cursor:pointer;transition:border-color .15s,background .15s}
+.lt-card:hover{border-color:var(--ac)}
+.lt-card.selected{border-color:var(--ac);background:rgba(36,71,214,.08)}
+[data-t=dark] .lt-card.selected{background:rgba(125,152,255,.14)}
+.lt-icon{font-size:24px;flex-shrink:0}
+.lt-info{display:flex;flex-direction:column;gap:2px}
+.lt-info b{font-size:13px;color:var(--tx)}
+.lt-info small{font-size:11px;color:var(--mu);line-height:1.3}
 #vp{position:relative;height:calc(100vh - 150px);min-height:420px;overflow:hidden;background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);cursor:grab;touch-action:none;background-image:radial-gradient(var(--ln) 1px,transparent 1px);background-size:24px 24px}
 #vp.pan{cursor:grabbing}
 #world{position:absolute;left:0;top:0;transform-origin:0 0}
@@ -283,15 +312,17 @@ function normalize(d){
  d.security=Object.assign({hideFinancesFromDesigner:true,designerProjectFilter:'all_non_secret'},d.security||{});
  let x=50,y=50;
  d.columns.forEach(c=>{
+  c.type=c.type||getColType(c);
   c.isSecret=!!c.isSecret;
   (c.cards=c.cards||[]).forEach(k=>{
    if(k.x===undefined||k.y===undefined){k.x=x;k.y=y;x+=260;if(x>900){x=50;y+=180}}
-   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];
-   (k.folderColumns||[]).forEach(fc=>fc.isSecret=!!fc.isSecret);
+   k.folderColumns=k.folderColumns||[{id:uid('f'),title:'Requerimientos',type:'projects',cards:[]},{id:uid('f'),title:'Proveedores',type:'suppliers',cards:[]}];
+   (k.folderColumns||[]).forEach(fc=>{fc.type=fc.type||getColType(fc);fc.isSecret=!!fc.isSecret;});
    k.fields=k.fields||[];k.budgetData=Object.assign(bdef(d),k.budgetData||{});k.profitData=Object.assign({approved:0,costs:[]},k.profitData||{});k.profitData.costs=Array.isArray(k.profitData.costs)?k.profitData.costs:[];
    k.phone=k.phone||'';k.location=k.location||'';k.notes=k.notes||'';k.specialty=k.specialty||'';
    k.briefData=normBrief(k.briefData);k.pinterestUrl=typeof k.pinterestUrl==='string'?k.pinterestUrl:'';
-   k.designerId=k.designerId||'';k.isDesigner=!!k.isDesigner;
+   k.designerId=k.designerId||'';k.isDesigner=isDesCol(c)||!!k.isDesigner;
+   k.isSupplier=isSuppCol(c)||!!k.isSupplier;
    k.isSecret=!!k.isSecret;k.designerAccess=k.designerAccess||'all';
   });
  });
@@ -414,7 +445,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
  }catch(x){err.textContent=x.message}$('#gb').disabled=false};
 
 /* ---------- Utilidades de estado ---------- */
-let F=null,VIEW='board';
+let F=null,VIEW='board',BOARD_LAYOUT=LS.getItem('nl_board_layout')||'grid',GRID_COLS=LS.getItem('nl_grid_cols')||'3';
 function locate(id){for(const c of S.columns)for(const k of c.cards){if(k.id===id)return{c:k,list:c};for(const f of (k.folderColumns||[]))for(const s of (f.cards||[]))if(s.id===id)return{c:s,list:f,parent:k}}}
 function isColVisible(l){if(ROLE==='admin')return true;return!l.isSecret}
 function isCardVisible(c,l){
@@ -440,10 +471,19 @@ function applyTheme(){const th=LS.getItem('nl_theme')||'auto';
 applyTheme();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyTheme);
 
 /* ---------- Proveedores, Diseñadores & Utilidades ---------- */
-function isSuppCol(l){return!!(l&&l.title&&l.title.toLowerCase().includes('proveed'))}
+function getColType(l){
+ if(!l)return'projects';
+ if(l.type)return l.type;
+ const t=(l.title||'').toLowerCase();
+ if(t.includes('proveed'))return'suppliers';
+ if(t.includes('diseñ'))return'designers';
+ return'projects';
+}
+function isSuppCol(l){return getColType(l)==='suppliers'}
 function isSupplierCard(c,l){return!!(c&&(c.isSupplier||(l&&isSuppCol(l))))}
-function isDesCol(l){return!!(l&&l.title&&l.title.toLowerCase().includes('diseñ'))}
+function isDesCol(l){return getColType(l)==='designers'}
 function isDesignerCard(c,l){return!!(c&&(c.isDesigner||(l&&isDesCol(l))))}
+function isProjCol(l){return getColType(l)==='projects'}
 
 function getGlobalSuppliers(){
  const list=[];
@@ -538,18 +578,42 @@ function render(){
  const desBadge=curDes?`<span class="b" style="margin-left:8px;font-size:12px;padding:3px 8px;font-weight:600" title="Diseñador a cargo">👤 ${esc(curDes.title)}</span>`:'';
  const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
  const budBtn=showFin?`<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`:'';
+ const layoutControls=(!F&&VIEW==='board')?`<div style="display:inline-flex;align-items:center;gap:3px;margin-left:10px;background:var(--cd);padding:2px 4px;border:1px solid var(--ln);border-radius:var(--r)">
+  <button class="b ${BOARD_LAYOUT==='grid'?'on':''}" data-act="setLayout" data-lay="grid" title="Vista en Cuadrícula" style="padding:3px 8px;font-size:12px">⊞ Cuadrícula</button>
+  <button class="b ${BOARD_LAYOUT==='row'?'on':''}" data-act="setLayout" data-lay="row" title="Vista Horizontal (una fila)" style="padding:3px 8px;font-size:12px">↔ Horizontal</button>
+  ${BOARD_LAYOUT==='grid'?`<select id="selGridCols" style="width:auto;padding:2px 5px;font-size:11px;font-weight:600;border:0;background:transparent;cursor:pointer" title="Columnas por fila">
+   <option value="auto" ${GRID_COLS==='auto'?'selected':''}>Auto</option>
+   <option value="2" ${GRID_COLS==='2'?'selected':''}>2 cols</option>
+   <option value="3" ${GRID_COLS==='3'?'selected':''}>3 cols</option>
+   <option value="4" ${GRID_COLS==='4'?'selected':''}>4 cols</option>
+  </select>`:''}</div>`:'';
  $('#nav').innerHTML=F?`<span class="crumb"><button class="b" data-act="home">← Tablero</button> <span>/</span> ${esc(curProj.title)}</span>${desBadge}${budBtn}`
-  :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>`;
+  :`<button class="b ${VIEW=='board'?'on':''}" data-act="view" data-v="board">📋 Tablero</button><button class="b ${VIEW=='org'?'on':''}" data-act="view" data-v="org">🔗 Organigrama</button>${layoutControls}`;
  const m=$('#main');
  if(!F&&VIEW==='org'){m.innerHTML=`<p class="hint">Arrastrá el fondo para moverte, la rueda para hacer zoom, las tarjetas para acomodarlas. Clic en una flecha para borrarla.</p><div id="vp"><div id="world"><svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--ac)"/></marker></defs></svg></div>
   <div class="zoom"><button class="b" data-act="zoom" data-d="1.2">＋</button><button class="b" data-act="zoom" data-d="0.83">−</button><button class="b" data-act="fit">Ajustar</button></div></div>`;org();return}
- m.innerHTML=`<div class="board">${cur().filter(isColVisible).map(l=>{
+ const boardClass=BOARD_LAYOUT==='grid'?`layout-grid grid-cols-${GRID_COLS}`:'layout-row';
+ m.innerHTML=`<div class="board ${boardClass}">${cur().filter(isColVisible).map((l, colIdx, colArr)=>{
   const isSup=isSuppCol(l);
   const isDes=isDesCol(l);
   const isColSec=!!l.isSecret;
   const cards=(l.cards||[]).filter(c=>isCardVisible(c,l));
+  const typeIcon=isDes?'🎨':(isSup?'🏭':'📁');
+  const typeName=isDes?'Diseñadores':(isSup?'Proveedores':'Proyectos');
   const secColBtn=ROLE==='admin'?`<button class="ib" data-act="quickColSecret" data-l="${l.id}" title="${isColSec?'Lista Secreta (oculta para diseñadores). Clic para hacerla visible.':'Lista Visible. Clic para hacerla secreta.'}">${isColSec?'🔒':'👁️'}</button>`:'';
-  return `<section class="col ${isColSec?'is-secret':''}"><header><input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista">${isColSec?'<span class="badge-sec" style="font-size:10px">🔒</span>':''}<span class="n">${cards.length}</span>${secColBtn}${ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button>`:''}</header>
+  const moveLeftBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="-1" title="Mover placa a la izquierda / arriba" ${colIdx===0?'disabled style="opacity:.25;cursor:default"':''}>◀</button>`;
+  const moveRightBtn=`<button class="ib" data-act="moveCol" data-l="${l.id}" data-dir="1" title="Mover placa a la derecha / abajo" ${colIdx===colArr.length-1?'disabled style="opacity:.25;cursor:default"':''}>▶</button>`;
+  const optBtn=`<button class="ib" data-act="colOptions" data-l="${l.id}" title="Opciones de placa (${typeName})">⚙️</button>`;
+  return `<section class="col ${isColSec?'is-secret':''}" data-col-id="${l.id}">
+  <header>
+   <span class="col-drag" draggable="true" data-coldrag="${l.id}" title="Arrastrar para mover placa en la cuadrícula">⠿</span>
+   <span title="Tipo de lista: ${typeName}" style="font-size:13px;cursor:pointer" data-act="colOptions" data-l="${l.id}">${typeIcon}</span>
+   <input data-ren="${l.id}" value="${esc(l.title)}" aria-label="Nombre de lista">
+   ${isColSec?'<span class="badge-sec" style="font-size:10px">🔒</span>':''}
+   <span class="n">${cards.length}</span>
+   ${moveLeftBtn}${moveRightBtn}${secColBtn}${optBtn}
+   ${ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar lista">✕</button>`:''}
+  </header>
   <div class="cl" data-drop="${l.id}">${cards.map(cardHTML).join('')}</div>
   <div style="display:flex;gap:4px">
    <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isDes&&!F?'Añadir diseñador':(isSup&&!F?'Añadir proveedor':'Añadir tarjeta')}</button>
@@ -782,7 +846,24 @@ const A={
  theme(){const o=['auto','light','dark'],c=LS.getItem('nl_theme')||'auto';LS.setItem('nl_theme',o[(o.indexOf(c)+1)%3]);applyTheme()},
  view(a){VIEW=a.dataset.v;render()},home(){F=null;render()},
  lock(){flush().then(()=>{S=KEY=VID=RAW_VMK=VAULT_KEYS=null;ROLE='admin';$('#app').hidden=true;$('#gate').hidden=false;$('#gk').value='';$('#gk').focus();toast('Sesión cerrada.')})},
- addList(){if(ROLE!=='admin'&&!F)return toast('Solo el Administrador puede añadir listas principales.','err');const t=prompt('Nombre de la nueva lista:');if(t){cur().push({id:uid('l'),title:t,cards:[]});save();render()}},
+ addList(){addListModal()},
+ moveCol(a){
+  const lid=a.dataset.l,dir=+a.dataset.dir;
+  const list=cur();
+  const idx=list.findIndex(c=>c.id===lid);
+  if(idx<0)return;
+  const targetIdx=idx+dir;
+  if(targetIdx<0||targetIdx>=list.length)return;
+  const item=list.splice(idx,1)[0];
+  list.splice(targetIdx,0,item);
+  save();render();
+ },
+ colOptions(a){colOptionsModal(a.dataset.l)},
+ setLayout(a){
+  BOARD_LAYOUT=a.dataset.lay;
+  LS.setItem('nl_board_layout',BOARD_LAYOUT);
+  render();
+ },
  delList(a){if(ROLE!=='admin')return toast('Solo el Administrador puede eliminar listas.','err');const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
   mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
  addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
@@ -908,15 +989,278 @@ document.addEventListener('input',e=>{if(!F)return;const t=e.target;
   else if(t.dataset.bk){const r=t.closest('.bf-extra');if(r&&B.extras[+r.dataset.bi])B.extras[+r.dataset.bi][t.dataset.bk]=t.value}
   updateBriefProgress();save();
  }});
-document.addEventListener('change',e=>{if(e.target.dataset.ren){const l=cur().find(x=>x.id===e.target.dataset.ren);l.title=e.target.value||'Lista';save()}});
-let dragId=null;
-document.addEventListener('dragstart',e=>{const c=e.target.closest?.('.cd');if(c){dragId=c.dataset.id;c.classList.add('drag');e.dataTransfer.setData('text/plain',dragId)}});
-document.addEventListener('dragend',()=>{dragId=null;document.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over'))});
-document.addEventListener('dragover',e=>{const d=e.target.closest?.('.cl');if(d&&dragId){e.preventDefault();d.classList.add('over')}});
-document.addEventListener('dragleave',e=>e.target.classList?.remove('over'));
-document.addEventListener('drop',e=>{const d=e.target.closest?.('.cl');if(!d||!dragId)return;e.preventDefault();
+document.addEventListener('change',e=>{
+ if(e.target.dataset.ren){const l=cur().find(x=>x.id===e.target.dataset.ren);l.title=e.target.value||'Lista';save();}
+ if(e.target.id==='selGridCols'){GRID_COLS=e.target.value;LS.setItem('nl_grid_cols',GRID_COLS);render();}
+});
+/* ---------- Modales de Listas / Placas ---------- */
+function addListModal(){
+ if(ROLE!=='admin'&&!F)return toast('Solo el Administrador puede añadir listas principales.','err');
+ const isInsideProject=!!F;
+ const typeCards=isInsideProject?`
+  <div class="list-type-cards">
+   <label class="lt-card selected">
+    <input type="radio" name="newColType" value="projects" checked hidden>
+    <div class="lt-icon">📋</div>
+    <div class="lt-info"><b>Requerimientos / Tareas</b><small>Ítems del proyecto, materiales, tareas o etapas internas.</small></div>
+   </label>
+   <label class="lt-card">
+    <input type="radio" name="newColType" value="suppliers" hidden>
+    <div class="lt-icon">🏭</div>
+    <div class="lt-info"><b>Proveedores asignados</b><small>Talleres o proveedores contratados para este proyecto.</small></div>
+   </label>
+  </div>`: `
+  <div class="list-type-cards">
+   <label class="lt-card selected">
+    <input type="radio" name="newColType" value="projects" checked hidden>
+    <div class="lt-icon">📁</div>
+    <div class="lt-info"><b>Proyectos</b><small>Carpetas de proyectos, brief de diseño CAD, presupuestos y rentabilidad.</small></div>
+   </label>
+   <label class="lt-card">
+    <input type="radio" name="newColType" value="suppliers" hidden>
+    <div class="lt-icon">🏭</div>
+    <div class="lt-info"><b>Proveedores</b><small>Directorio de talleres y empresas: contacto, WhatsApp, rubro, Google Maps y llamado a proyectos.</small></div>
+   </label>
+   <label class="lt-card">
+    <input type="radio" name="newColType" value="designers" hidden>
+    <div class="lt-icon">🎨</div>
+    <div class="lt-info"><b>Diseñadores</b><small>Equipo de diseño: roles, software, asignación de proyectos y control de disponibilidad.</small></div>
+   </label>
+  </div>`;
+
+ const m=modal(`<h3>➕ Añadir Nueva Lista</h3>
+  <p class="hint" style="margin:0 0 10px">Elegí qué tipo de contenido tendrá esta columna para aplicar automáticamente sus funciones y normas:</p>
+  <div class="f">
+   <label>Tipo de lista:</label>
+   ${typeCards}
+  </div>
+  <div class="f" style="margin-top:12px">
+   <label>Nombre de la lista:</label>
+   <input id="newColTitle" placeholder="Ej: Proyectos en taller, Proveedores Chapa, Diseñadores 3D..." required>
+  </div>
+  ${ROLE==='admin'?`
+  <div class="f" style="margin-top:8px">
+   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600">
+    <input type="checkbox" id="newColSec" style="width:auto">
+    <span>🔒 Lista Secreta (oculta para diseñadores)</span>
+   </label>
+  </div>`:''}
+  <div class="acts">
+   <button class="b" data-act="closeM">Cancelar</button>
+   <button class="b p" id="btnCreateCol">Crear Lista</button>
+  </div>`,'520px');
+
+ const cards=m.querySelectorAll('.lt-card');
+ cards.forEach(c=>{
+  c.onclick=()=>{
+   cards.forEach(x=>x.classList.remove('selected'));
+   c.classList.add('selected');
+   c.querySelector('input').checked=true;
+  };
+ });
+
+ const submit=()=>{
+  const title=m.querySelector('#newColTitle').value.trim();
+  if(!title)return toast('Ingresá un nombre para la lista.','err');
+  const type=m.querySelector('input[name="newColType"]:checked')?.value||'projects';
+  const isSecret=m.querySelector('#newColSec')?.checked||false;
+  cur().push({id:uid('l'),title,type,isSecret,cards:[]});
+  save();closeM();render();
+  const label=type==='suppliers'?'Proveedores 🏭':(type==='designers'?'Diseñadores 🎨':'Proyectos 📁');
+  toast(`Lista «${title}» creada como ${label}.`);
+ };
+
+ m.querySelector('#btnCreateCol').onclick=submit;
+ m.querySelector('#newColTitle').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submit()}};
+ m.querySelector('#newColTitle').focus();
+}
+
+function colOptionsModal(lid){
+ const l=cur().find(x=>x.id===lid);
+ if(!l)return;
+ const curType=getColType(l);
+ const isInsideProject=!!F;
+ const typeCards=isInsideProject?`
+  <div class="list-type-cards">
+   <label class="lt-card ${curType==='projects'?'selected':''}">
+    <input type="radio" name="optColType" value="projects" ${curType==='projects'?'checked':''} hidden>
+    <div class="lt-icon">📋</div>
+    <div class="lt-info"><b>Requerimientos / Tareas</b><small>Ítems del proyecto, materiales, tareas o etapas de fabricación.</small></div>
+   </label>
+   <label class="lt-card ${curType==='suppliers'?'selected':''}">
+    <input type="radio" name="optColType" value="suppliers" ${curType==='suppliers'?'checked':''} hidden>
+    <div class="lt-icon">🏭</div>
+    <div class="lt-info"><b>Proveedores asignados</b><small>Talleres o proveedores contratados para este proyecto.</small></div>
+   </label>
+  </div>`: `
+  <div class="list-type-cards">
+   <label class="lt-card ${curType==='projects'?'selected':''}">
+    <input type="radio" name="optColType" value="projects" ${curType==='projects'?'checked':''} hidden>
+    <div class="lt-icon">📁</div>
+    <div class="lt-info"><b>Proyectos</b><small>Carpetas de proyectos, brief de diseño CAD, presupuestos y rentabilidad.</small></div>
+   </label>
+   <label class="lt-card ${curType==='suppliers'?'selected':''}">
+    <input type="radio" name="optColType" value="suppliers" ${curType==='suppliers'?'checked':''} hidden>
+    <div class="lt-icon">🏭</div>
+    <div class="lt-info"><b>Proveedores</b><small>Directorio de talleres y empresas: contacto, WhatsApp, rubro, Google Maps y llamado a proyectos.</small></div>
+   </label>
+   <label class="lt-card ${curType==='designers'?'selected':''}">
+    <input type="radio" name="optColType" value="designers" ${curType==='designers'?'checked':''} hidden>
+    <div class="lt-icon">🎨</div>
+    <div class="lt-info"><b>Diseñadores</b><small>Equipo de diseño: roles, software, asignación de proyectos y control de disponibilidad.</small></div>
+   </label>
+  </div>`;
+
+ const m=modal(`<h3>⚙️ Opciones de Lista · ${esc(l.title)}</h3>
+  <div class="f">
+   <label>Nombre de la lista:</label>
+   <input id="optColTitle" value="${esc(l.title)}">
+  </div>
+  <div class="f" style="margin-top:10px">
+   <label>Tipo de lista y normas aplicadas:</label>
+   ${typeCards}
+  </div>
+  ${ROLE==='admin'?`
+  <div class="f" style="margin-top:10px">
+   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600">
+    <input type="checkbox" id="optColSec" ${l.isSecret?'checked':''} style="width:auto">
+    <span>🔒 Lista Secreta (oculta para diseñadores)</span>
+   </label>
+  </div>`:''}
+  <div class="f" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--ln)">
+   <label>Mover posición de la placa en la cuadrícula:</label>
+   <div style="display:flex;gap:6px">
+    <button class="b" type="button" id="btnMoveFirst" style="flex:1">⏮ Al inicio</button>
+    <button class="b" type="button" id="btnMoveLeft" style="flex:1">◀ Hacia atrás</button>
+    <button class="b" type="button" id="btnMoveRight" style="flex:1">▶ Hacia adelante</button>
+    <button class="b" type="button" id="btnMoveLast" style="flex:1">⏭ Al final</button>
+   </div>
+  </div>
+  <div class="acts" style="display:flex;justify-content:space-between;align-items:center">
+   ${ROLE==='admin'||F?`<button class="b d" type="button" id="btnDelColModal">Eliminar lista</button>`:'<div></div>'}
+   <div style="display:flex;gap:8px">
+    <button class="b" data-act="closeM">Cancelar</button>
+    <button class="b p" id="btnSaveColOpt">Guardar Cambios</button>
+   </div>
+  </div>`,'540px');
+
+ const cards=m.querySelectorAll('.lt-card');
+ cards.forEach(c=>{
+  c.onclick=()=>{
+   cards.forEach(x=>x.classList.remove('selected'));
+   c.classList.add('selected');
+   c.querySelector('input').checked=true;
+  };
+ });
+
+ const list=cur();
+ m.querySelector('#btnMoveFirst').onclick=()=>{
+  const idx=list.indexOf(l);
+  if(idx>0){list.splice(idx,1);list.unshift(l);save();render();closeM();toast(`Placa «${l.title}» movida al inicio.`);}
+ };
+ m.querySelector('#btnMoveLast').onclick=()=>{
+  const idx=list.indexOf(l);
+  if(idx<list.length-1){list.splice(idx,1);list.push(l);save();render();closeM();toast(`Placa «${l.title}» movida al final.`);}
+ };
+ m.querySelector('#btnMoveLeft').onclick=()=>{
+  const idx=list.indexOf(l);
+  if(idx>0){list.splice(idx,1);list.splice(idx-1,0,l);save();render();closeM();}
+ };
+ m.querySelector('#btnMoveRight').onclick=()=>{
+  const idx=list.indexOf(l);
+  if(idx<list.length-1){list.splice(idx,1);list.splice(idx+1,0,l);save();render();closeM();}
+ };
+ m.querySelector('#btnDelColModal')?.addEventListener('click',()=>{
+  closeM();
+  A.delList({dataset:{l:l.id}});
+ });
+
+ m.querySelector('#btnSaveColOpt').onclick=()=>{
+  const newT=m.querySelector('#optColTitle').value.trim()||l.title;
+  const newType=m.querySelector('input[name="optColType"]:checked')?.value||'projects';
+  l.title=newT;
+  l.type=newType;
+  if(m.querySelector('#optColSec'))l.isSecret=m.querySelector('#optColSec').checked;
+  (l.cards||[]).forEach(c=>{
+   if(newType==='suppliers'){c.isSupplier=true;c.isDesigner=false;}
+   else if(newType==='designers'){c.isDesigner=true;c.isSupplier=false;}
+   else{c.isSupplier=false;c.isDesigner=false;if(!c.folderColumns)c.folderColumns=[{id:uid('f'),title:'Requerimientos',cards:[]},{id:uid('f'),title:'Proveedores',cards:[]}];}
+  });
+  save();closeM();render();
+  toast(`Placa actualizada como «${newT}».`);
+ };
+}
+
+/* ---------- Arrastre (Tarjetas y Placas en Cuadrícula) ---------- */
+let dragId=null,dragColId=null;
+document.addEventListener('dragstart',e=>{
+ const colHandle=e.target.closest?.('[data-coldrag]');
+ if(colHandle){
+  dragColId=colHandle.dataset.coldrag;
+  const col=colHandle.closest('.col');
+  if(col)col.classList.add('col-dragging');
+  e.dataTransfer.setData('text/col',dragColId);
+  return;
+ }
+ const c=e.target.closest?.('.cd');
+ if(c){
+  dragId=c.dataset.id;
+  c.classList.add('drag');
+  e.dataTransfer.setData('text/plain',dragId);
+ }
+});
+document.addEventListener('dragend',()=>{
+ dragId=null;dragColId=null;
+ document.querySelectorAll('.drag,.over,.col-dragging,.col-over').forEach(x=>x.classList.remove('drag','over','col-dragging','col-over'));
+});
+document.addEventListener('dragover',e=>{
+ if(dragColId){
+  const col=e.target.closest?.('.col');
+  if(col&&col.dataset.colId!==dragColId){
+   e.preventDefault();
+   document.querySelectorAll('.col-over').forEach(x=>{if(x!==col)x.classList.remove('col-over')});
+   col.classList.add('col-over');
+   return;
+  }
+ }
+ const d=e.target.closest?.('.cl');
+ if(d&&dragId){e.preventDefault();d.classList.add('over')}
+});
+document.addEventListener('dragleave',e=>{
+ const col=e.target.closest?.('.col');
+ if(col&&!col.contains(e.relatedTarget))col.classList.remove('col-over');
+ const d=e.target.closest?.('.cl');
+ if(d&&!d.contains(e.relatedTarget))d.classList.remove('over');
+});
+document.addEventListener('drop',e=>{
+ if(dragColId){
+  const targetCol=e.target.closest?.('.col');
+  if(targetCol&&targetCol.dataset.colId!==dragColId){
+   e.preventDefault();
+   const list=cur();
+   const fromIdx=list.findIndex(c=>c.id===dragColId);
+   const toIdx=list.findIndex(c=>c.id===targetCol.dataset.colId);
+   if(fromIdx>=0&&toIdx>=0&&fromIdx!==toIdx){
+    const item=list.splice(fromIdx,1)[0];
+    list.splice(toIdx,0,item);
+    save();render();toast(`Placa «${item.title}» movida.`);
+   }
+  }
+  dragColId=null;
+  return;
+ }
+ const d=e.target.closest?.('.cl');
+ if(!d||!dragId)return;
+ e.preventDefault();
  const to=cur().find(l=>l.id===d.dataset.drop),from=cur().find(l=>l.cards.some(c=>c.id===dragId));
- if(to&&from){const c=from.cards.splice(from.cards.findIndex(c=>c.id===dragId),1)[0];to.cards.push(c);save();render()}});
+ if(to&&from){
+  const c=from.cards.splice(from.cards.findIndex(c=>c.id===dragId),1)[0];
+  to.cards.push(c);
+  if(isSuppCol(to)){c.isSupplier=true;c.isDesigner=false;}
+  else if(isDesCol(to)){c.isDesigner=true;c.isSupplier=false;}
+  save();render();
+ }
+});
 async function handleImport(e){
  const f=e.target.files[0];e.target.value='';if(!f)return;
  try{
