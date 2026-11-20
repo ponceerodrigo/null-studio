@@ -149,6 +149,8 @@ td input{border:0;padding:4px;background:none}td.r{text-align:right;white-space:
 .role-badge.admin{background:#4f46e5;color:#fff}
 .role-badge.des{background:#059669;color:#fff}
 .badge-sec{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:1px 6px;border-radius:99px;background:#8b5cf622;color:#8b5cf6;border:1px solid #8b5cf655}
+.badge-self{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:1px 6px;border-radius:99px;background:#10b98122;color:#10b981;border:1px solid #10b98155}
+.cd.is-self{border-left:4px solid #10b981!important}
 .cd.is-secret{border-left:4px solid #8b5cf6!important;background:linear-gradient(90deg, #8b5cf612, transparent)}
 .col.is-secret{border:2px dashed #8b5cf6!important}
 .col.is-secret header{background:#8b5cf615;border-radius:var(--r) var(--r) 0 0}
@@ -338,7 +340,7 @@ function normalize(d){
    k.briefData=normBrief(k.briefData);k.pinterestUrl=typeof k.pinterestUrl==='string'?k.pinterestUrl:'';
    k.designerId=k.designerId||'';k.isDesigner=isDesCol(c)||!!k.isDesigner;
    k.isSupplier=isSuppCol(c)||!!k.isSupplier;
-   k.isSecret=!!k.isSecret;k.designerAccess=k.designerAccess||'all';
+   k.isSecret=!!k.isSecret;k.designerAccess=k.designerAccess||'all';k.isSelf=!!k.isSelf;
   });
  });
  if(!d.columns.some(isDesCol)){
@@ -685,7 +687,7 @@ function render(){
   <div class="cl" data-drop="${l.id}">${cards.map(cardHTML).join('')}</div>
   <div style="display:flex;gap:4px">
    <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isDes&&!F?'Añadir diseñador':(isSup&&!F?'Añadir proveedor':'Añadir tarjeta')}</button>
-   ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button>`:''}
+   ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button><button class="add" data-act="addSelfSup" data-l="${l.id}" title="Agregar proveedor propio (Nosotros mismos - Suma a la ganancia)" style="color:var(--ok);font-weight:700">🙋‍♂️ + Nosotros</button>`:''}
   </div></section>`;
  }).join('')}${ROLE==='admin'||F?'<button class="addcol" data-act="addList">+ Añadir lista</button>':''}</div>`;
  if(F){
@@ -703,7 +705,7 @@ function getProjectCardCosts(k){
    const u=num(c.unitPrice);
    const cost=cents(q,u);
    if(cost>0){
-    items.push({card:c,colTitle:col.title||'Lista',cost,qty:q,unitPrice:u});
+    items.push({card:c,colTitle:col.title||'Lista',cost,qty:q,unitPrice:u,isSelf:!!c.isSelf});
    }
   }
  }
@@ -719,17 +721,18 @@ function profitHTML(k){
    <div class="papp"><span>$</span><input id="pApp" type="number" min="0" step="any" placeholder="0.00" value="${P.approved||''}"></div></div>
   <div class="psum">
    <div class="psum-row"><span>Presupuesto aprobado:</span><b id="psA">$0,00</b></div>
-   <div class="psum-row"><span>Costos en tarjetas (tablero):</span><b id="psCardCost" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row"><span>Costos externos (tarjetas):</span><b id="psCardCost" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row" id="psSelfRow" style="display:none"><span>🙋‍♂️ Proveedor propio (Nosotros):</span><b id="psSelfCost" style="color:var(--ok)">+$0,00</b></div>
    <div class="psum-row"><span>Otros costos / gastos:</span><b id="psExtraCost" style="color:var(--dg)">-$0,00</b></div>
-   <div class="psum-row" style="border-top:1px dashed var(--ln);padding-top:4px"><span>Total costos del proyecto:</span><b id="psC" style="color:var(--dg)">-$0,00</b></div>
+   <div class="psum-row" style="border-top:1px dashed var(--ln);padding-top:4px"><span>Total costos externos:</span><b id="psC" style="color:var(--dg)">-$0,00</b></div>
    <div class="psum-net"><span>Ganancia neta (queda):</span><span id="psN">$0,00</span></div>
    <div class="psum-row" style="margin-top:2px"><span>Porcentaje que queda (margen):</span><b id="psP" style="font-size:15px">0%</b></div>
    <div class="pbar"><div id="psB" style="width:0%"></div></div>
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><label class="lb" style="margin:0">Costos de tarjetas (<span id="psCardCnt">${cardItems.length}</span>)</label></div>
-  <div class="pcosts" id="pCardList" style="max-height:160px;overflow-y:auto">${cardItems.length?cardItems.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:6px 9px;font-size:12px;gap:6px">
-   <div style="min-width:0;flex:1"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(x.card.title)}">${esc(x.card.title)}</div><div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.colTitle)} · ${x.qty} × ${fmt(cents(1,x.unitPrice))}</div></div>
-   <b style="color:var(--dg);white-space:nowrap">${fmt(x.cost)}</b><button class="ib" data-act="edit" data-id="${x.card.id}" title="Editar tarjeta">⚙️</button></div>`).join(''):'<div class="hint" style="margin:0;font-size:12px">No hay tarjetas con costo aún. Asigná "Costo unitario" en las propiedades de una tarjeta.</div>'}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px"><label class="lb" style="margin:0">Tarjetas con costo / valor (<span id="psCardCnt">${cardItems.length}</span>)</label></div>
+  <div class="pcosts" id="pCardList" style="max-height:160px;overflow-y:auto">${cardItems.length?cardItems.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--cd);border:1px solid ${x.isSelf?'#10b981':'var(--ln)'};border-radius:var(--r);padding:6px 9px;font-size:12px;gap:6px">
+   <div style="min-width:0;flex:1"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(x.card.title)}">${x.isSelf?'🙋‍♂️ ':'🏭 '}${esc(x.card.title)} ${x.isSelf?'<span class="badge-self" style="font-size:10px;padding:0 5px">Nosotros</span>':''}</div><div style="font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.colTitle)} · ${x.qty} × ${fmt(cents(1,x.unitPrice))}</div></div>
+   <b style="color:${x.isSelf?'var(--ok)':'var(--dg)'};white-space:nowrap">${x.isSelf?'+':'-'}${fmt(x.cost)}</b><button class="ib" data-act="edit" data-id="${x.card.id}" title="Editar tarjeta">⚙️</button></div>`).join(''):'<div class="hint" style="margin:0;font-size:12px">No hay tarjetas con costo aún. Asigná "Costo unitario" en las propiedades de una tarjeta.</div>'}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><label class="lb" style="margin:0">Otros costos / gastos (<span id="psCnt">${P.costs.length}</span>)</label></div>
   <div class="pcosts" id="pCosts">${P.costs.map((x,i)=>`<div class="pcrow" data-ci="${i}"><input class="pcd" data-ck="desc" placeholder="Ítem de costo / gasto…" value="${esc(x.desc)}"><input class="pca" data-ck="amount" type="number" min="0" step="any" placeholder="$ Monto" value="${x.amount||''}"><button class="ib" data-act="delCost" data-ci="${i}" title="Quitar costo">✕</button></div>`).join('')}</div>
   <button class="b" data-act="addCost" style="width:100%">+ Agregar ítem de costo</button></aside>`}
@@ -738,17 +741,23 @@ function calcProfit(){
  const proj=locate(F).c;
  const P=proj.profitData,ac=cents(1,P.approved);
  const cardItems=getProjectCardCosts(proj);
- const cardCost=cardItems.reduce((a,x)=>a+x.cost,0);
+ const extCardCost=cardItems.filter(x=>!x.isSelf).reduce((a,x)=>a+x.cost,0);
+ const selfCardCost=cardItems.filter(x=>x.isSelf).reduce((a,x)=>a+x.cost,0);
  const extraCost=P.costs.reduce((a,x)=>a+cents(1,x.amount),0);
- const cc=cardCost+extraCost,nc=ac-cc;
- const pct=ac>0?(nc/ac)*100:(cc>0?-100:0),col=nc<0?'var(--dg)':(pct<20&&ac>0?'#d97706':'var(--ok)');
+ const totalExtCost=extCardCost+extraCost;
+ const nc=ac - totalExtCost + selfCardCost;
+ const totalBase=ac>0?ac:(selfCardCost>0?selfCardCost:0);
+ const pct=totalBase>0?(nc/totalBase)*100:(totalExtCost>0?-100:0);
+ const col=nc<0?'var(--dg)':(pct<20&&totalBase>0?'#d97706':'var(--ok)');
  $('#psA').textContent=fmt(ac);
- const cEl=$('#psCardCost');if(cEl)cEl.textContent=(cardCost>0?'-':'')+fmt(cardCost);
+ const cEl=$('#psCardCost');if(cEl)cEl.textContent=(extCardCost>0?'-':'')+fmt(extCardCost);
+ const sEl=$('#psSelfCost');if(sEl)sEl.textContent=(selfCardCost>0?'+':'')+fmt(selfCardCost);
+ const sRow=$('#psSelfRow');if(sRow)sRow.style.display=selfCardCost>0?'flex':'none';
  const eEl=$('#psExtraCost');if(eEl)eEl.textContent=(extraCost>0?'-':'')+fmt(extraCost);
- $('#psC').textContent=(cc>0?'-':'')+fmt(cc);
+ $('#psC').textContent=(totalExtCost>0?'-':'')+fmt(totalExtCost);
  const nEl=$('#psN');nEl.textContent=(nc<0?'-':'')+fmt(Math.abs(nc));nEl.style.color=col;
- const pEl=$('#psP');pEl.textContent=(ac>0||cc>0?pct.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'0%');pEl.style.color=col;
- const bEl=$('#psB');bEl.style.width=Math.max(0,Math.min(100,ac>0?(nc/ac)*100:0))+'%';bEl.style.background=col}
+ const pEl=$('#psP');pEl.textContent=(totalBase>0||totalExtCost>0?pct.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'0%');pEl.style.color=col;
+ const bEl=$('#psB');bEl.style.width=Math.max(0,Math.min(100,totalBase>0?(nc/totalBase)*100:0))+'%';bEl.style.background=col}
 const BRIEF_FIELDS=[
  {k:'user',icon:'👤',title:'Usuario objetivo',sub:'¿Para quién es?',ph:'Perfil del usuario final, necesidades, nivel técnico y contexto...'},
  {k:'problem',icon:'🎯',title:'Problema o producto a realizar',sub:'¿Qué se diseña?',ph:'Necesidad a resolver, tipo de producto/pieza y objetivo principal...'},
@@ -876,9 +885,14 @@ const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
 function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l),isDes=isDesignerCard(c,l);
  const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
  const p=c.profitData,ac=p?cents(1,p.approved):0;
- const cardCost=getProjectCardCosts(c).reduce((a,x)=>a+x.cost,0);
+ const cardItems=getProjectCardCosts(c);
+ const extCardCost=cardItems.filter(x=>!x.isSelf).reduce((a,x)=>a+x.cost,0);
+ const selfCardCost=cardItems.filter(x=>x.isSelf).reduce((a,x)=>a+x.cost,0);
  const extraCost=p?(p.costs||[]).reduce((a,x)=>a+cents(1,x.amount),0):0;
- const cc=cardCost+extraCost,pct=ac>0?Math.round(((ac-cc)/ac)*100):0;
+ const totalExtCost=extCardCost+extraCost;
+ const nc=ac - totalExtCost + selfCardCost;
+ const totalBase=ac>0?ac:(selfCardCost>0?selfCardCost:0);
+ const pct=totalBase>0?Math.round((nc/totalBase)*100):(totalExtCost>0?-100:0);
  let meta='';
  if(!F&&isDes){
   const projs=getDesignerProjects(c.id);
@@ -889,25 +903,32 @@ function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(
   const ph=c.phone?`📞 ${esc(c.phone)}`:'';
   meta=[spec,projTag,ph].filter(Boolean).join(' · ');
  }else if(!F&&isSupp){
-  meta=[c.specialty?`🏷️ <b>${esc(c.specialty)}</b>`:'',c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:'',c.notes?`📝 ${esc(c.notes.slice(0,30))}${c.notes.length>30?'…':''}`:''].filter(Boolean).join(' · ');
+  const selfTag=c.isSelf?'<span class="badge-self">🙋‍♂️ Nosotros mismos</span>':'';
+  meta=[selfTag,c.specialty?`🏷️ <b>${esc(c.specialty)}</b>`:'',c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:'',c.notes?`📝 ${esc(c.notes.slice(0,30))}${c.notes.length>30?'…':''}`:''].filter(Boolean).join(' · ');
  }else if(F){
-  const cost=c.unitPrice>0?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`:(c.qty>1?'Cant. '+c.qty:'');
+  const cost=c.unitPrice>0
+   ?(c.isSelf
+     ?`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b style="color:var(--ok)">+${fmt(cents(c.qty,c.unitPrice))}</b> <span class="badge-self" style="font-size:10px;padding:0 5px">🙋‍♂️ Suma ganancia</span>`
+     :`${c.qty} × ${fmt(cents(1,c.unitPrice))} = <b>${fmt(cents(c.qty,c.unitPrice))}</b>`)
+   :(c.qty>1?'Cant. '+c.qty:'');
+  const selfBadge=(c.isSelf&&!c.unitPrice)?'<span class="badge-self" style="font-size:10px;padding:0 5px">🙋‍♂️ Nosotros mismos</span>':'';
   const inf=[c.phone?`📞 ${esc(c.phone)}`:'',c.location?`📍 ${esc(c.location)}`:''].filter(Boolean).join(' · ');
-  meta=[(showFin?cost:''),inf].filter(Boolean).join(' · ');
+  meta=[selfBadge,(showFin?cost:''),inf].filter(Boolean).join(' · ');
  }else{
   const des=c.designerId?getGlobalDesigners().find(d=>d.id===c.designerId):null;
   const desTag=des?`👤 <b>${esc(des.title)}</b>`:'<span style="color:var(--mu);font-size:11px">👤 <i>Sin diseñador</i></span>';
   const bSt=c.briefData?briefStats(normBrief(c.briefData)):null;
   const bTag=bSt&&bSt.done?`📐 Brief ${bSt.done}/${bSt.total}`:'';
   const items=(n=>n?`📌 ${n} ítems`:'')(c.folderColumns.reduce((a,f)=>a+f.cards.length,0));
-  const mon=showFin?(ac>0?`💰 ${fmt(ac)} (${pct}% libre)`:(cc>0?`💸 Costos ${fmt(cc)}`:'')):'';
+  const mon=showFin?(ac>0||selfCardCost>0?`💰 Ganancia ${fmt(nc)} (${pct}% libre)`:(totalExtCost>0?`💸 Costos ${fmt(totalExtCost)}`:'')):'';
   meta=[desTag,bTag,items,mon].filter(Boolean).join(' · ');
  }
- const icon=(!F&&isDes)?'🎨 ':((!F&&isSupp)?'🏭 ':(F?(isSupp?'🏭 ':''):'📁 '));
+ const icon=(!F&&isDes)?'🎨 ':((!F&&isSupp)?(c.isSelf?'🙋‍♂️ ':'🏭 '):(F?(isSupp?(c.isSelf?'🙋‍♂️ ':'🏭 '):''):'📁 '));
  const secTag=(ROLE==='admin'&&c.isSecret)?`<span class="badge-sec">🔒 Secreto</span>`:'';
+ const selfTagTop=(c.isSelf&&F&&!meta.includes('Nosotros'))?`<span class="badge-self" style="font-size:10px;padding:0 5px">Nosotros</span>`:'';
  const secBtn=(ROLE==='admin'&&!isSupp&&!isDes)?`<button class="ib" data-act="quickSecret" data-id="${c.id}" title="${c.isSecret?'Proyecto Secreto (clic para hacerlo visible a diseñadores)':'Proyecto Visible (clic para hacerlo secreto/oculto)'}">${c.isSecret?'🔒':'👁️'}</button>`:'';
  const acts=(!F&&!isSupp&&!isDes&&showFin)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
- return `<div class="cd ${custom(c)?'cc':''} ${c.isSecret?'is-secret':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)} ${secTag}</span><span>${secBtn}${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button>${ROLE==='admin'||F?`<button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button>`:''}</span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
+ return `<div class="cd ${custom(c)?'cc':''} ${c.isSecret?'is-secret':''} ${c.isSelf?'is-self':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)} ${secTag}${selfTagTop}</span><span>${secBtn}${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button>${ROLE==='admin'||F?`<button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button>`:''}</span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
 const A={
@@ -947,27 +968,47 @@ const A={
  accessModal(){accessModal()},
  callSupplier(a){
   const lid=a.dataset.l,sups=getGlobalSuppliers();
-  if(!sups.length)return toast('No hay proveedores en la lista "Proveedores" del tablero principal. Creá uno allí primero.','err');
   const m=modal(`<h3>🏭 Llamar Proveedor al Proyecto</h3>
-  <p class="hint" style="margin-bottom:12px">Elegí un proveedor guardado para agregarlo a esta lista con sus datos de contacto:</p>
-  <div style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;margin-bottom:14px">
+  <p class="hint" style="margin-bottom:12px">Elegí un proveedor guardado o agregá directamente un ítem de trabajo propio (Nosotros mismos):</p>
+  <div style="background:var(--cd);border:2px dashed #10b981;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+   <div>
+    <div style="font-weight:700;color:#10b981">🙋‍♂️ Nosotros mismos (Taller / Producción propia)</div>
+    <div style="font-size:11.5px;color:var(--mu);margin-top:2px">Agregá un ítem donde el trabajo lo hacemos nosotros. El gasto <b>suma a la ganancia</b> del proyecto en lugar de restar.</div>
+   </div>
+   <button class="b p" data-act="pickSelfSup" data-lid="${lid}" style="background:#10b981;border-color:#10b981;white-space:nowrap">+ Agregar Nosotros</button>
+  </div>
+  ${sups.length?`<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:14px">
    ${sups.map(s=>`
-    <div style="background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div style="background:var(--cd);border:1px solid ${s.isSelf?'#10b981':'var(--ln)'};border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
      <div style="min-width:0;flex:1">
-      <div style="font-weight:700">${esc(s.title)} ${s.specialty?`<span class="n" style="font-size:11px;background:var(--pn);padding:2px 6px;border-radius:4px;border:1px solid var(--ln);margin-left:4px">${esc(s.specialty)}</span>`:''}</div>
+      <div style="font-weight:700">${s.isSelf?'🙋‍♂️ ':'🏭 '}${esc(s.title)} ${s.isSelf?'<span class="badge-self" style="font-size:10px;padding:0 5px">Nosotros mismos</span>':''} ${s.specialty?`<span class="n" style="font-size:11px;background:var(--pn);padding:2px 6px;border-radius:4px;border:1px solid var(--ln);margin-left:4px">${esc(s.specialty)}</span>`:''}</div>
       <div style="font-size:12px;color:var(--mu);margin-top:3px">${[s.phone?'📞 '+esc(s.phone):'',s.location?'📍 '+esc(s.location):''].filter(Boolean).join(' · ')}</div>
       ${s.notes?`<div style="font-size:11px;color:var(--mu);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${esc(s.notes)}</div>`:''}
      </div>
      <button class="b p" data-act="pickSup" data-sid="${s.id}" data-lid="${lid}">+ Agregar</button>
     </div>`).join('')}
-  </div>
+  </div>`:'<div class="hint" style="margin-bottom:14px">No hay otros proveedores guardados en el tablero principal. Podés usar la opción de arriba para agregar «Nosotros mismos».</div>'}
   <div class="acts"><button class="b" data-act="closeM">Cerrar</button></div>`,'540px');
+ },
+ pickSelfSup(a){
+  const l=cur().find(x=>x.id===a.dataset.lid);
+  if(!l)return;
+  const id=uid('k');
+  const k={id,title:'Nosotros mismos',specialty:'Producción / Taller propio',phone:'',location:'Taller propio',notes:'',supplierId:'',isSupplier:true,isSelf:true,qty:1,unitPrice:0,color:'#10b981',fields:[],folderColumns:[]};
+  l.cards.push(k);save();closeM();render();editCard(id);toast('Proveedor propio «Nosotros mismos» agregado al proyecto.');
+ },
+ addSelfSup(a){
+  const l=cur().find(x=>x.id===a.dataset.l);
+  if(!l)return;
+  const id=uid('k');
+  const k={id,title:'Nosotros mismos',specialty:'Producción / Taller propio',phone:'',location:'Taller propio',notes:'',supplierId:'',isSupplier:true,isSelf:true,qty:1,unitPrice:0,color:'#10b981',fields:[],folderColumns:[]};
+  l.cards.push(k);save();render();editCard(id);toast('Proveedor «Nosotros mismos» creado. Ingresá el monto que sumará a la ganancia.');
  },
  pickSup(a){
   const s=getGlobalSuppliers().find(x=>x.id===a.dataset.sid),l=cur().find(x=>x.id===a.dataset.lid);
   if(!s||!l)return;
   const id=uid('k');
-  const k={id,title:s.title,specialty:s.specialty||'',phone:s.phone||'',location:s.location||'',notes:s.notes||'',supplierId:s.id,isSupplier:true,qty:1,unitPrice:0,color:s.color||'#ffffff',fields:[],folderColumns:[]};
+  const k={id,title:s.title,specialty:s.specialty||'',phone:s.phone||'',location:s.location||'',notes:s.notes||'',supplierId:s.id,isSupplier:true,isSelf:!!s.isSelf,qty:1,unitPrice:0,color:s.color||(s.isSelf?'#10b981':'#ffffff'),fields:[],folderColumns:[]};
   l.cards.push(k);save();closeM();render();editCard(id);toast(`Proveedor «${s.title}» agregado al proyecto.`);
  },
  delCard(a){mark();const r=locate(a.dataset.id);r.list.cards.splice(r.list.cards.indexOf(r.c),1);S.connections=S.connections.filter(c=>c.from!==r.c.id&&c.to!==r.c.id);save();render();toast(`"${r.c.title}" eliminada.`,'',undo)},
@@ -1476,6 +1517,15 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar Diseñador</button></div>`;
  }else if(isGlobalSupp){
   body=`<h3>🏢 Ficha de Proveedor</h3>
+  <div class="box" style="background:var(--cd);border-left:4px solid ${c.isSelf?'#10b981':'#3b82f6'};padding:8px 12px;margin-bottom:12px">
+   <label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+    <div>
+     <b style="color:${c.isSelf?'#10b981':'var(--tx)'};font-size:13px">🙋‍♂️ Este proveedor somos nosotros mismos</b>
+     <div class="hint" style="margin:2px 0 0;font-size:11.5px">Al llamarlo a cualquier proyecto, sus gastos sumarán a la ganancia en vez de restar.</div>
+    </div>
+    <input type="checkbox" id="chkIsSelf" ${c.isSelf?'checked':''} style="width:auto;cursor:pointer">
+   </label>
+  </div>
   <div class="f"><label>Nombre del proveedor / Razón social</label><input id="e1" value="${esc(c.title)}"></div>
   <div class="row">
    <div class="f"><label>Rubro / Especialidad</label><input id="esup_spec" placeholder="Ej: Corte láser, Tornería, Pintura..." value="${esc(c.specialty||'')}"></div>
@@ -1524,9 +1574,27 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
    <div class="f" style="margin:0;flex:2"><label>🏭 Proveedor guardado:</label><select id="selSup"><option value="">— Cargar datos de proveedor guardado —</option>${supOpts}</select></div>
    <button class="b" type="button" id="btnApplySup">Copiar datos</button>
   </div>`:''}
+  ${F&&isSupp?`<div class="box" id="boxSelfSupplier" style="background:var(--cd);border-left:4px solid ${c.isSelf?'#10b981':'#3b82f6'};padding:10px 12px;margin-bottom:12px">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div>
+     <b id="lblSelfSupplierTitle" style="color:${c.isSelf?'#10b981':'var(--tx)'};display:flex;align-items:center;gap:6px;font-size:13.5px">
+      <span>${c.isSelf?'🙋‍♂️ Proveedor Propio (Nosotros Mismos)':'🏭 Proveedor Externo'}</span>
+     </b>
+     <div class="hint" id="hintSelfSupplier" style="margin:3px 0 0;font-size:11.5px">
+      ${c.isSelf
+        ? '🟢 <b>Trabajo interno:</b> Este gasto lo realizamos nosotros. <u>Suma a la ganancia</u> del proyecto en lugar de restar.'
+        : '⚪ <b>Taller o proveedor externo:</b> Este gasto se paga a un tercero y <u>resta</u> de la ganancia.'}
+     </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;background:var(--pn);padding:6px 10px;border-radius:6px;border:1px solid var(--ln);white-space:nowrap;user-select:none">
+     <input type="checkbox" id="chkIsSelf" ${c.isSelf?'checked':''} style="width:auto;cursor:pointer">
+     <span style="font-size:12px">🙋‍♂️ Somos nosotros</span>
+    </label>
+   </div>
+  </div>`:''}
   <div class="f"><label>Nombre</label><input id="e1" value="${esc(c.title)}"></div>
-  <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div>${showFin?`<div class="f"><label>Costo unitario ($)</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>`:''}
-  <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||'#ffffff')}" style="height:35px;padding:2px"></div></div>
+  <div class="row"><div class="f"><label>Cantidad</label><input id="e2" type="number" min="0" step="any" value="${c.qty??1}"></div>${showFin?`<div class="f"><label id="lblUnitPrice">Costo unitario ($)${c.isSelf?' <b style="color:#10b981;font-size:11px">🟢 Suma a ganancia</b>':''}</label><input id="e3" type="number" min="0" step="any" value="${c.unitPrice??0}"></div>`:''}
+  <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||(c.isSelf?'#10b981':'#ffffff'))}" style="height:35px;padding:2px"></div></div>
   ${F?`<div class="row"><div class="f"><label>Teléfono / Contacto</label><input id="esup_phone" placeholder="Opcional" value="${esc(c.phone||'')}"></div><div class="f"><label>Ubicación</label><input id="esup_loc" placeholder="Opcional" value="${esc(c.location||'')}"></div></div>
   <div class="f"><label>Anotaciones extras</label><textarea id="esup_notes" rows="2" placeholder="Notas sobre el trabajo, entrega, etc.">${esc(c.notes||'')}</textarea></div>`:''}
   ${(!F&&!r.parent&&!isSupp&&showFin)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`:''}
@@ -1537,6 +1605,34 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
  m.querySelector('#chkIsSecret')?.addEventListener('change',e=>{
   const d=m.querySelector('#secDetails');if(d)d.style.display=e.target.checked?'none':'block';
  });
+ m.querySelector('#chkIsSelf')?.addEventListener('change',e=>{
+  const on=e.target.checked;
+  const box=m.querySelector('#boxSelfSupplier');
+  const title=m.querySelector('#lblSelfSupplierTitle');
+  const hint=m.querySelector('#hintSelfSupplier');
+  const unitLbl=m.querySelector('#lblUnitPrice');
+  const e1=m.querySelector('#e1');
+  const e4=m.querySelector('#e4');
+  if(box)box.style.borderLeftColor=on?'#10b981':'#3b82f6';
+  if(title){
+   title.innerHTML=`<span>${on?'🙋‍♂️ Proveedor Propio (Nosotros Mismos)':'🏭 Proveedor Externo'}</span>`;
+   title.style.color=on?'#10b981':'var(--tx)';
+  }
+  if(hint){
+   hint.innerHTML=on
+     ?'🟢 <b>Trabajo interno:</b> Este gasto lo realizamos nosotros. <u>Suma a la ganancia</u> del proyecto en lugar de restar.'
+     :'⚪ <b>Taller o proveedor externo:</b> Este gasto se paga a un tercero y <u>resta</u> de la ganancia.';
+  }
+  if(unitLbl){
+   unitLbl.innerHTML=on
+     ?'Costo unitario ($) <b style="color:#10b981;font-size:11px">🟢 Suma a ganancia</b>'
+     :'Costo unitario ($)';
+  }
+  if(on){
+   if(e1&&(e1.value.trim()===''||e1.value==='Nuevo proveedor'||e1.value==='Nuevo ítem'))e1.value='Nosotros mismos';
+   if(e4&&(!e4.value||e4.value.toLowerCase()==='#ffffff'))e4.value='#10b981';
+  }
+ });
  m.querySelector('#btnApplySup')?.addEventListener('click',()=>{
   const sid=m.querySelector('#selSup').value;
   const s=getGlobalSuppliers().find(x=>x.id===sid);
@@ -1545,7 +1641,11 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   if(m.querySelector('#esup_phone'))m.querySelector('#esup_phone').value=s.phone||'';
   if(m.querySelector('#esup_loc'))m.querySelector('#esup_loc').value=s.location||'';
   if(m.querySelector('#esup_notes'))m.querySelector('#esup_notes').value=s.notes||'';
-  c.supplierId=s.id;c.isSupplier=true;
+  if(m.querySelector('#chkIsSelf')){
+   m.querySelector('#chkIsSelf').checked=!!s.isSelf;
+   m.querySelector('#chkIsSelf').dispatchEvent(new Event('change'));
+  }
+  c.supplierId=s.id;c.isSupplier=true;c.isSelf=!!s.isSelf;
  });
  m.querySelector('#btnSaveDesPwCard')?.addEventListener('click',async()=>{
   const pw=m.querySelector('#edes_pw').value.trim();
@@ -1596,6 +1696,7 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
     syncDesignerConnection(c.id,newDesId,oldDesId);
    }
   }
+  if(m.querySelector('#chkIsSelf'))c.isSelf=m.querySelector('#chkIsSelf').checked;
   if(m.querySelector('#e2'))c.qty=num(m.querySelector('#e2').value);
   if(m.querySelector('#e3'))c.unitPrice=num(m.querySelector('#e3').value);
   c.color=m.querySelector('#e4').value;
