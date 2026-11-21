@@ -243,11 +243,21 @@ async function setAdminPassword(oldPw,newPw,newPw2){
  toast('Contraseña de Administrador actualizada.');}
 
 /* ---------- Nube (Supabase REST): solo guarda el blob cifrado ---------- */
-let VID=null,CREV=null,CONF=false,Q=Promise.resolve();
-const CL=()=>{try{return JSON.parse(LS.getItem('nl_cloud'))}catch{return null}};
-const H=c=>Object.assign({apikey:c.key,'Content-Type':'application/json'},c.key.startsWith('eyJ')?{Authorization:'Bearer '+c.key}:{});
-async function vid(pw){const k=await crypto.subtle.importKey('raw',te.encode(pw),'PBKDF2',false,['deriveBits']);
- const b=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:te.encode('nl-vault-id-v1'),iterations:250000,hash:'SHA-256'},k,256));return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
+const DEFAULT_CLOUD = {
+ url: 'https://cppnfoifusuzyeapgfiv.supabase.co',
+ key: 'sb_publishable_i3gXBq-p0JW7FNwvYgwEaA_HIC4hwLS'
+};
+const DEFAULT_VID = 'null_studio_main';
+let VID=DEFAULT_VID,CREV=null,CONF=false,Q=Promise.resolve();
+const CL=()=>{
+ try{
+  const c=JSON.parse(LS.getItem('nl_cloud'));
+  if(c&&c.url&&c.key)return c;
+ }catch{}
+ return DEFAULT_CLOUD;
+};
+const H=c=>Object.assign({apikey:c.key,'Content-Type':'application/json'},(c.key.startsWith('eyJ')||c.key.startsWith('sb_publishable_'))?{Authorization:'Bearer '+c.key}:{});
+async function vid(pw){return DEFAULT_VID}
 async function cget(){const c=CL(),r=await fetch(`${c.url}/rest/v1/vault?id=eq.${VID}&select=data,rev`,{headers:H(c)});
  if(!r.ok)throw new Error(r.status===404?'falta crear la tabla (ver SQL en ☁️)':r.status===401||r.status===403?'clave de Supabase rechazada':'error '+r.status);return(await r.json())[0]||null}
 function setCS(k){const b=$('#bcl');if(b)b.textContent={ok:'☁️ ✓',off:'☁️ ⚠',conf:'☁️ ✗',none:'☁️'}[k]}
@@ -279,7 +289,7 @@ async function applyRow(row,pw){
   }
   VAULT_KEYS=row.data.keys;
   SALT=unb(row.data.keys.admin.s);
-  if(row.data.vid)VID=row.data.vid;
+  VID=DEFAULT_VID;
   d=normalize(await unseal(row.data,KEY));
  }else{
   let k=KEY,sl=SALT;
@@ -297,19 +307,23 @@ addEventListener('focus',async()=>{if(!KEY||!CL()||!VID||document.querySelector(
   if(LS.getItem('nl_dirty')||CONF||r.data.s!==b64(SALT)){CONF=true;setCS('conf');return toast('Otra PC subió cambios. Abrí ☁️ para elegir qué versión conservar.','err')}
   await applyRow(r);if(F&&!locate(F))F=null;render();setCS('ok');toast('Se cargaron cambios de la nube.','',undo)}catch{}});
 async function enableCloud(url,key){const pw=prompt('Reingresá tu clave para activar la nube:');if(!pw)return;
- try{await unseal(JSON.parse(LS.getItem(VK)),await derive(pw,SALT))}catch{return toast('Clave incorrecta.','err')}
- const prev=LS.getItem('nl_cloud'),pv=VID;LS.setItem('nl_cloud',JSON.stringify({url:url.trim().replace(/\/+$/,''),key:key.trim()}));VID=await vid(pw);
+ try{
+  const b=JSON.parse(LS.getItem(VK));
+  if(b.keys&&b.keys.admin)await unwrapVMK(b.keys.admin,pw);
+  else await unseal(b,await derive(pw,SALT));
+ }catch{return toast('Clave incorrecta.','err')}
+ const prev=LS.getItem('nl_cloud');LS.setItem('nl_cloud',JSON.stringify({url:url.trim().replace(/\/+$/,''),key:key.trim()}));VID=DEFAULT_VID;
  try{const row=await cget();CONF=false;CREV=null;
-  if(row){if(!confirm('Ya hay datos en la nube. Aceptar = traerlos (reemplazan lo de esta PC; queda copia previa). Cancelar = no activar.')){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');VID=pv;return}
+  if(row){if(!confirm('Ya hay datos en la nube. Aceptar = traerlos (reemplazan lo de esta PC; queda copia previa). Cancelar = no activar.')){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');return}
    await applyRow(row,pw);F=null;render()}
   else{LS.setItem('nl_dirty','1');await push()}
-  setCS('ok');closeM();toast('Nube activada.')}catch(x){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');VID=pv;toast('No se pudo conectar: '+x.message,'err')}}
-function cloudModal(){const c=CL()||{url:'',key:''};
- const sql='create table vault (id text primary key, data jsonb not null, rev bigint not null default 1);\nalter table vault enable row level security;\ncreate policy "ins" on vault for insert to anon with check (true);\ncreate policy "sel" on vault for select to anon using (true);\ncreate policy "upd" on vault for update to anon using (true) with check (true);';
- const m=modal(`<h3>☁️ Sincronización en la nube</h3><p>Se sube una copia <b>cifrada con tu clave</b>: el servidor solo guarda texto ilegible. Con una cuenta gratuita de Supabase: creá un proyecto, abrí <i>SQL Editor</i>, ejecutá esto y pegá abajo la <i>Project URL</i> y la clave <i>anon / publishable</i> (Project Settings → API).</p>
+  setCS('ok');closeM();toast('Nube activada.')}catch(x){prev?LS.setItem('nl_cloud',prev):LS.removeItem('nl_cloud');toast('No se pudo conectar: '+x.message,'err')}}
+function cloudModal(){const c=CL()||DEFAULT_CLOUD;
+ const sql='create table vault (id text primary key, data jsonb not null, rev bigint not null default 1);\nalter table vault enable row level security;\ngrant all on table vault to anon, authenticated;\ncreate policy "ins" on vault for insert to anon with check (true);\ncreate policy "sel" on vault for select to anon using (true);\ncreate policy "upd" on vault for update to anon using (true) with check (true);';
+ const m=modal(`<h3>☁️ Sincronización en la nube</h3><p>Se sube una copia <b>cifrada con tu clave</b>: el servidor solo guarda texto ilegible. Conectado a la base de datos Supabase en tiempo real.</p>
  <pre style="background:var(--cd);border:1px solid var(--ln);border-radius:6px;padding:10px;font-size:12px;overflow:auto">${esc(sql)}</pre>
  <div class="row"><div class="f"><label>Project URL</label><input id="cu" value="${esc(c.url)}" placeholder="https://xxxx.supabase.co"></div><div class="f"><label>Clave anon / publishable</label><input id="ck" value="${esc(c.key)}"></div></div>
- <p class="hint">${CL()?(VID?(CONF?'Conflicto: otra PC guardó cambios.':'Activa · revisión '+(CREV??'-')):'Configurada: cerrá con 🔒 y entrá de nuevo.'):'Sin configurar: los datos quedan solo en este navegador.'}</p>
+ <p class="hint">${CONF?'Conflicto: otra PC guardó cambios.':'Sincronización automática activa · revisión '+(CREV??'-')}</p>
  <div class="acts"><button class="b" data-act="closeM">Cerrar</button><button class="b" id="cpull">Traer de la nube</button><button class="b" id="cforce">Subir esta versión</button><button class="b p" id="csave">Guardar y activar</button></div>`,'720px');
  const T=f=>async()=>{try{await f()}catch(x){toast(x.message,'err')}},need=()=>{if(!CL()||!VID)throw new Error('Activá la nube primero.')};
  m.querySelector('#csave').onclick=T(()=>enableCloud(m.querySelector('#cu').value,m.querySelector('#ck').value));
@@ -391,7 +405,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
    KEY=await importVMK(RAW_VMK);
    VAULT_KEYS={admin:await wrapVMK(RAW_VMK,pw,SALT),designer:null};
    ROLE='admin';
-   VID=cl?await vid(pw):null;
+   VID=DEFAULT_VID;
    let old=null;try{old=JSON.parse(LS.getItem(OLD))}catch{}
    S=normalize(old&&old.columns?old:demo());await flush();
    if(old&&await unseal(JSON.parse(LS.getItem(VK)),KEY)){LS.removeItem(OLD);toast('Datos anteriores migrados y cifrados.')}
@@ -400,8 +414,10 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
    if(rawBox){try{box=JSON.parse(rawBox)}catch{}}
    if(!box)box=SEED_VAULT;
    if(cl){
-    VID=box?.vid||(await vid(pw));
+    VID=DEFAULT_VID;
+    
     try{row=await cget()}catch(x){if(!box)throw new Error('No se pudo leer la nube: '+x.message);off=true}
+     if(row&&row.data&&(!rawBox||row.rev>(+LS.getItem('nl_rev')||0)))box=row.data;
    }
    if(!box&&row){
     await applyRow(row,pw);
@@ -441,7 +457,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
      KEY=await importVMK(RAW_VMK);
      VAULT_KEYS=box.keys;
      SALT=unb(box.keys.admin.s);
-     if(box.vid)VID=box.vid;
+     VID=DEFAULT_VID;
      try{S=normalize(await unseal(box,KEY))}catch{throw new Error('Error al descifrar los datos.')}
     }else{
      SALT=unb(box.s);
@@ -451,7 +467,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
      RAW_VMK=crypto.getRandomValues(new Uint8Array(32));
      KEY=await importVMK(RAW_VMK);
      VAULT_KEYS={admin:await wrapVMK(RAW_VMK,pw,SALT),designer:null};
-     VID=cl?await vid(pw):null;
+     VID=DEFAULT_VID;
      await flush();
      toast('Bóveda actualizada al nuevo sistema con soporte de Diseñador y Proyectos Secretos.');
     }
