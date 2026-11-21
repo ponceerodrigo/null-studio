@@ -339,7 +339,7 @@ addEventListener('storage',e=>{if(e.key===VK&&KEY)toast('Otra pestaña modificó
 const demo=()=>({columns:[{id:'c1',title:'Ideas / Backlog',cards:[]},{id:'c2',title:'En proceso',cards:[]},{id:'c3',title:'Completado',cards:[]}],connections:[],templates:[]});
 function normalize(d){
  if(!d||!Array.isArray(d.columns))throw new Error('Formato inválido');
- d.connections=Array.isArray(d.connections)?d.connections:[];d.templates=d.templates||[];
+ d.connections=Array.isArray(d.connections)?d.connections:[];d.templates=d.templates||[];d.projectTemplates=d.projectTemplates||[];
  d.security=Object.assign({hideFinancesFromDesigner:true,designerProjectFilter:'all_non_secret'},d.security||{});
  let x=50,y=50;
  d.columns.forEach(c=>{
@@ -483,7 +483,7 @@ $('#gf').onsubmit=async e=>{e.preventDefault();const pw=$('#gk').value,err=$('#g
   if(CONF)toast('Conflicto con la nube: abrí ☁️ para elegir qué versión conservar.','err');
   else if(cl&&(off||(!isNew&&LS.getItem('nl_dirty'))||(row===null&&!off)))push();
   if(ROLE==='admin')toast('👑 Modo Administrador activo. Acceso total a proyectos secretos y configuración.');
-  else toast('🎨 Modo Diseñador activo.');
+  else toast('🎨 Modo Usuario activo. Podés crear proyectos, plantillas y proveedores.');
  }catch(x){err.textContent=x.message}$('#gb').disabled=false};
 
 /* ---------- Utilidades de estado ---------- */
@@ -603,11 +603,16 @@ function renderTools(){
  const t=$('.tools');if(!t)return;
  const th=LS.getItem('nl_theme')||'auto';
  const thLabel={auto:'🌗 Auto',light:'☀️ Claro',dark:'🌙 Oscuro'}[th];
+ const sharedBtns=`
+  <button class="b" data-act="templates" title="Ver, crear y aplicar plantillas de presupuestos y proyectos">📑 Plantillas</button>
+  <button class="b" data-act="suppliers" title="Directorio y registro de proveedores y talleres">🏭 Proveedores</button>
+  <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro">${thLabel}</button>`;
+
  if(ROLE==='admin'){
-  t.innerHTML=`<span class="role-badge admin" title="Modo Administrador: ves todo">👑 Administrador</span>
-   <button class="b" data-act="accessModal" title="Gestión de contraseñas y permisos de diseñadores" style="border-color:#4f46e5;color:#4f46e5;font-weight:700">🔑 Permisos y Claves</button>
+  t.innerHTML=`<span class="role-badge admin" title="Modo Administrador: ves todo y controlás visibilidad">👑 Administrador</span>
+   <button class="b" data-act="accessModal" title="Gestión de contraseñas y permisos" style="border-color:#4f46e5;color:#4f46e5;font-weight:700">🔑 Permisos y Claves</button>
+   ${sharedBtns}
    <button class="b" data-act="cloud" id="bcl" title="Sincronización en la nube">☁️</button>
-   <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro">${thLabel}</button>
    <button class="b" data-act="export" title="Descargar respaldo cifrado">💾 Respaldo</button>
    <label class="b" title="Cargar respaldo (.json)">📂 Cargar<input type="file" id="imp" accept=".json" hidden></label>
    <button class="b" data-act="restore" title="Volver a la copia anterior">↩ Copia previa</button>
@@ -615,8 +620,8 @@ function renderTools(){
   const imp=$('#imp');if(imp)imp.onchange=handleImport;
   setCS(!CL()?'none':CONF?'conf':VID?'ok':'none');
  }else{
-  t.innerHTML=`<span class="role-badge des" title="Modo Diseñador: solo ves los proyectos autorizados">🎨 Diseñador</span>
-   <button class="b" data-act="theme" id="bth" title="Tema: automático / claro / oscuro">${thLabel}</button>
+  t.innerHTML=`<span class="role-badge des" title="Modo Usuario: podés crear proyectos, plantillas y agregar proveedores">🎨 Usuario</span>
+   ${sharedBtns}
    <button class="b" data-act="lock" title="Cerrar sesión">🔒 Salir</button>`;
  }
 }
@@ -627,8 +632,8 @@ function render(){
  if(F&&(!curProj||!isCardVisible(curProj))){F=null;render();return}
  const curDes=curProj&&curProj.designerId?getGlobalDesigners().find(d=>d.id===curProj.designerId):null;
  const desBadge=curDes?`<span class="b" style="margin-left:8px;font-size:12px;padding:3px 8px;font-weight:600" title="Diseñador a cargo">👤 ${esc(curDes.title)}</span>`:'';
- const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
- const budBtn=showFin?`<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`:'';
+ const showFin=true;
+ const budBtn=`<button class="b g" data-act="budget" data-id="${F}" style="margin-left:auto">📊 Presupuesto</button>`;
  const layoutControls=(!F&&VIEW==='board')?`<div style="display:inline-flex;align-items:center;gap:3px;margin-left:10px;background:var(--cd);padding:2px 4px;border:1px solid var(--ln);border-radius:var(--r)">
   <button class="b ${BOARD_LAYOUT==='grid'?'on':''}" data-act="setLayout" data-lay="grid" title="Vista en Cuadrícula" style="padding:3px 8px;font-size:12px">⊞ Cuadrícula</button>
   <button class="b ${BOARD_LAYOUT==='row'?'on':''}" data-act="setLayout" data-lay="row" title="Vista Horizontal (una fila)" style="padding:3px 8px;font-size:12px">↔ Horizontal</button>
@@ -674,7 +679,7 @@ function render(){
 
   const secColBtn=ROLE==='admin'&&!isSpacer?`<button class="ib" data-act="quickColSecret" data-l="${l.id}" title="${isColSec?'Lista Secreta (oculta para diseñadores). Clic para hacerla visible.':'Lista Visible. Clic para hacerla secreta.'}">${isColSec?'🔒':'👁️'}</button>`:'';
   const optBtn=`<button class="ib" data-act="colOptions" data-l="${l.id}" title="Opciones y posición en cuadrícula (Placa #${slotNum})">⚙️</button>`;
-  const delBtn=ROLE==='admin'?`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar ${isSpacer?'espacio libre':'lista'}">✕</button>`:'';
+  const delBtn=`<button class="ib" data-act="delList" data-l="${l.id}" title="Eliminar ${isSpacer?'espacio libre':'lista'}">✕</button>`;
 
   if(isSpacer){
    return `<section class="col col-spacer" data-col-id="${l.id}">
@@ -705,7 +710,7 @@ function render(){
    <button class="add" data-act="addCard" data-l="${l.id}" style="flex:1">+ ${isDes&&!F?'Añadir diseñador':(isSup&&!F?'Añadir proveedor':'Añadir tarjeta')}</button>
    ${F&&isSup?`<button class="add" data-act="callSupplier" data-l="${l.id}" title="Llamar proveedor registrado" style="color:var(--ac);font-weight:700">🏭 Llamar</button><button class="add" data-act="addSelfSup" data-l="${l.id}" title="Agregar proveedor propio (Nosotros mismos - Suma a la ganancia)" style="color:var(--ok);font-weight:700">🙋‍♂️ + Nosotros</button>`:''}
   </div></section>`;
- }).join('')}${ROLE==='admin'||F?'<button class="addcol" data-act="addList">+ Añadir lista</button>':''}</div>`;
+ }).join('')}<button class="addcol" data-act="addList">+ Añadir lista</button></div>`;
  if(F){
   const pr=locate(F).c;
   m.innerHTML=`<div class="pview">${m.innerHTML}${briefHTML(pr)}${showFin?profitHTML(pr):''}</div>`;
@@ -899,7 +904,7 @@ function formatBriefText(k){
 }
 const custom=c=>c.color&&c.color.toLowerCase()!=='#ffffff';
 function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(c,l),isDes=isDesignerCard(c,l);
- const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
+ const showFin=true;
  const p=c.profitData,ac=p?cents(1,p.approved):0;
  const cardItems=getProjectCardCosts(c);
  const extCardCost=cardItems.filter(x=>!x.isSelf).reduce((a,x)=>a+x.cost,0);
@@ -944,7 +949,7 @@ function cardHTML(c){const r=locate(c.id),l=r?r.list:null,isSupp=isSupplierCard(
  const selfTagTop=(c.isSelf&&F&&!meta.includes('Nosotros'))?`<span class="badge-self" style="font-size:10px;padding:0 5px">Nosotros</span>`:'';
  const secBtn=(ROLE==='admin'&&!isSupp&&!isDes)?`<button class="ib" data-act="quickSecret" data-id="${c.id}" title="${c.isSecret?'Proyecto Secreto (clic para hacerlo visible a diseñadores)':'Proyecto Visible (clic para hacerlo secreto/oculto)'}">${c.isSecret?'🔒':'👁️'}</button>`:'';
  const acts=(!F&&!isSupp&&!isDes&&showFin)?`<button class="ib" data-act="budget" data-id="${c.id}" title="Presupuesto en Excel">📊</button>`:'';
- return `<div class="cd ${custom(c)?'cc':''} ${c.isSecret?'is-secret':''} ${c.isSelf?'is-self':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)} ${secTag}${selfTagTop}</span><span>${secBtn}${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button>${ROLE==='admin'||F?`<button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button>`:''}</span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
+ return `<div class="cd ${custom(c)?'cc':''} ${c.isSecret?'is-secret':''} ${c.isSelf?'is-self':''}" draggable="true" data-id="${c.id}" style="${custom(c)?'background:'+esc(c.color):''}"><div class="t"><span>${icon}${esc(c.title)} ${secTag}${selfTagTop}</span><span>${secBtn}${acts}<button class="ib" data-act="edit" data-id="${c.id}" title="Propiedades">⚙️</button><button class="ib" data-act="delCard" data-id="${c.id}" title="Eliminar">✕</button></span></div>${meta?`<div class="m">${meta}</div>`:''}</div>`}
 
 /* ---------- Eventos ---------- */
 const A={
@@ -971,7 +976,7 @@ const A={
   LS.setItem('nl_board_layout',BOARD_LAYOUT);
   render();
  },
- delList(a){if(ROLE!=='admin')return toast('Solo el Administrador puede eliminar listas.','err');const l=cur().find(x=>x.id===a.dataset.l);if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
+ delList(a){const l=cur().find(x=>x.id===a.dataset.l);if(!l)return;if(l.cards.length&&!confirm(`La lista "${l.title}" tiene ${l.cards.length} tarjetas. ¿Eliminarla con todo su contenido?`))return;
   mark();const arr=cur();arr.splice(arr.indexOf(l),1);const ids=new Set(l.cards.map(c=>c.id));S.connections=S.connections.filter(c=>!ids.has(c.from)&&!ids.has(c.to));save();render();toast('Lista eliminada.','',undo)},
  addCard(a){const l=cur().find(x=>x.id===a.dataset.l),id=uid('k');
   const isSupp=isSuppCol(l),isDes=isDesCol(l);
@@ -1029,7 +1034,7 @@ const A={
  },
  delCard(a){mark();const r=locate(a.dataset.id);r.list.cards.splice(r.list.cards.indexOf(r.c),1);S.connections=S.connections.filter(c=>c.from!==r.c.id&&c.to!==r.c.id);save();render();toast(`"${r.c.title}" eliminada.`,'',undo)},
  open(a){const r=locate(a.dataset.id);if(r&&!isCardVisible(r.c,r.list))return toast('No tienes acceso a esta carpeta.','err');F=a.dataset.id;VIEW='board';render()},
- edit(a){editCard(a.dataset.id)},budget(a){if(ROLE==='designer'&&S.security?.hideFinancesFromDesigner)return toast('Acceso restringido en Modo Diseñador.','err');budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},
+ edit(a){editCard(a.dataset.id)},budget(a){budgetModal(a.dataset.id)},link(a){linkModal(a.dataset.id)},templates(){templatesModal()},suppliers(){suppliersModal()},newSupplier(){newSupplierModal()},
  addCost(){if(!F)return;const P=locate(F).c.profitData;P.costs.push({id:uid('c'),desc:'',amount:0});save();render();const r=document.querySelectorAll('#pCosts .pcd');r[r.length-1]?.focus()},
  delCost(a){if(!F)return;const P=locate(F).c.profitData;P.costs.splice(+a.dataset.ci,1);save();render()},
  syncBud(){if(!F)return;const c=locate(F).c,tot=totalC(c.budgetData)/100;if(!tot)return toast('El presupuesto 📊 todavía está en $0.','err');c.profitData.approved=tot;delete c.profitData.manualApproved;save();render();toast('Monto sincronizado con el presupuesto.')},
@@ -1122,7 +1127,6 @@ document.addEventListener('change',e=>{
 });
 /* ---------- Modales de Listas / Placas ---------- */
 function addListModal(){
- if(ROLE!=='admin'&&!F)return toast('Solo el Administrador puede añadir listas principales.','err');
  const isInsideProject=!!F;
  const typeCards=isInsideProject?`
   <div class="list-type-cards">
@@ -1198,7 +1202,7 @@ function addListModal(){
    if(type==='spacer') title='Espacio libre';
    else return toast('Ingresá un nombre para la lista.','err');
   }
-  const isSecret=m.querySelector('#newColSec')?.checked||false;
+  const isSecret=(ROLE==='admin')?(m.querySelector('#newColSec')?.checked||false):false;
   cur().push({id:uid('l'),title,type,isSecret,cards:[]});
   save();closeM();render();
   const label=type==='suppliers'?'Proveedores 🏭':(type==='designers'?'Diseñadores 🎨':(type==='spacer'?'Espacio vacío ⬜':'Proyectos 📁'));
@@ -1298,7 +1302,7 @@ function colOptionsModal(lid){
    </div>
   </div>
   <div class="acts" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-   ${ROLE==='admin'||F?`<button class="b d" type="button" id="btnDelColModal">Eliminar lista</button>`:'<div></div>'}
+   <button class="b d" type="button" id="btnDelColModal">Eliminar lista</button>
    <div style="display:flex;gap:8px">
     <button class="b" data-act="closeM">Cancelar</button>
     <button class="b p" id="btnSaveColOpt">Guardar Cambios</button>
@@ -1368,7 +1372,7 @@ function colOptionsModal(lid){
   const newType=m.querySelector('input[name="optColType"]:checked')?.value||'projects';
   l.title=newT;
   l.type=newType;
-  if(m.querySelector('#optColSec'))l.isSecret=m.querySelector('#optColSec').checked;
+  if(ROLE==='admin'&&m.querySelector('#optColSec'))l.isSecret=m.querySelector('#optColSec').checked;
   (l.cards||[]).forEach(c=>{
    if(newType==='suppliers'){c.isSupplier=true;c.isDesigner=false;}
    else if(newType==='designers'){c.isDesigner=true;c.isSupplier=false;}
@@ -1562,7 +1566,7 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   const allDes=getGlobalDesigners();
   const desOpts=allDes.map(d=>`<option value="${d.id}" ${c.designerId===d.id?'selected':''}>${esc(d.title)}${d.specialty?' ('+esc(d.specialty)+')':''}</option>`).join('');
   const curDes=c.designerId?allDes.find(d=>d.id===c.designerId):null;
-  const showFin=ROLE==='admin'||!S.security?.hideFinancesFromDesigner;
+  const showFin=true;
   body=`<h3>${F?(isSupp?'🏭 Proveedor en proyecto':'Propiedades de ítem'):'Propiedades de proyecto'}</h3>
   ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:end;background:var(--cd)">
    <div class="f" style="margin:0;flex:2"><label>👤 Diseñador a cargo del proyecto:</label><select id="selDes"><option value="">— Sin diseñador asignado (Sin trabajo) —</option>${desOpts}</select></div>
@@ -1613,7 +1617,8 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   <div class="f"><label>Color</label><input id="e4" type="color" value="${esc(c.color||(c.isSelf?'#10b981':'#ffffff'))}" style="height:35px;padding:2px"></div></div>
   ${F?`<div class="row"><div class="f"><label>Teléfono / Contacto</label><input id="esup_phone" placeholder="Opcional" value="${esc(c.phone||'')}"></div><div class="f"><label>Ubicación</label><input id="esup_loc" placeholder="Opcional" value="${esc(c.location||'')}"></div></div>
   <div class="f"><label>Anotaciones extras</label><textarea id="esup_notes" rows="2" placeholder="Notas sobre el trabajo, entrega, etc.">${esc(c.notes||'')}</textarea></div>`:''}
-  ${(!F&&!r.parent&&!isSupp&&showFin)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>`:''}
+  ${(!F&&!r.parent&&!isSupp)?`<div class="box row" style="align-items:center"><div style="flex:3"><b>Presupuesto del proyecto</b><div class="hint" style="margin:0">Cargá costos, usá plantillas y descargá la planilla de Excel.</div></div><button class="b g" id="ebud" type="button">📊 Ver / editar presupuesto</button></div>
+  <div class="box row" style="align-items:center"><div style="flex:3"><b>Plantilla de este proyecto</b><div class="hint" style="margin:0">Guardá la estructura de este proyecto como plantilla reutilizable.</div></div><button class="b" id="btnSaveProjTplInEdit" type="button">💾 Guardar como plantilla</button></div>`:''}
   <div id="flds">${c.fields.map(f=>fld(f.label,f.value)).join('')}</div><button class="b" id="addf" type="button">+ Campo de texto</button>
   <div class="acts"><button class="b" data-act="closeM">Cancelar</button><button class="b p" id="ok">Guardar</button></div>`;
  }
@@ -1673,10 +1678,11 @@ function editCard(id){const r=locate(id);if(!r)return;const c=r.c,l=r.list;
   }catch(x){toast(x.message,'err')}
  });
  m.querySelector('#ebud')?.addEventListener('click',()=>{m.querySelector('#ok').click();budgetModal(id)});
+ m.querySelector('#btnSaveProjTplInEdit')?.addEventListener('click',()=>{saveProjectTemplate(id);});
  m.querySelector('#addf').onclick=()=>m.querySelector('#flds').insertAdjacentHTML('beforeend',fld('',''));
  m.querySelector('#ok').onclick=()=>{
   c.title=m.querySelector('#e1').value.trim()||'Sin título';
-  if(m.querySelector('#chkIsSecret')){
+  if(ROLE==='admin'&&m.querySelector('#chkIsSecret')){
    c.isSecret=m.querySelector('#chkIsSecret').checked;
    if(m.querySelector('#selDesAccess'))c.designerAccess=m.querySelector('#selDesAccess').value;
   }
@@ -1864,8 +1870,390 @@ function accessModal(){
  });
 }
 
+
+/* ---------- Centro de Plantillas & Directorio de Proveedores ---------- */
+function saveProjectTemplate(projId){
+ const r=locate(projId);if(!r)return;
+ const c=r.c;
+ const name=prompt('Nombre para la plantilla de proyecto:', c.title + ' (Plantilla)');
+ if(!name)return;
+ S.projectTemplates=S.projectTemplates||[];
+ const tpl={
+  id:uid('pt'),
+  name,
+  description:c.notes||'',
+  color:c.color||'#ffffff',
+  columns:(c.folderColumns||[]).map(fc=>({
+   title:fc.title,
+   type:fc.type||'projects',
+   cards:(fc.cards||[]).map(card=>({
+    title:card.title,
+    notes:card.notes||'',
+    qty:card.qty||1,
+    unitPrice:card.unitPrice||0,
+    isSelf:!!card.isSelf,
+    isSupplier:!!card.isSupplier,
+    specialty:card.specialty||'',
+    phone:card.phone||'',
+    location:card.location||'',
+    color:card.color||'#ffffff'
+   }))
+  })),
+  briefData:structuredClone(c.briefData||briefDef()),
+  budgetData:structuredClone(c.budgetData||bdef())
+ };
+ S.projectTemplates.push(tpl);
+ save();
+ toast(`Plantilla de proyecto «${name}» guardada.`);
+}
+
+function createProjectFromTemplate(tplId, targetColId){
+ const tpl=(S.projectTemplates||[]).find(t=>t.id===tplId);
+ if(!tpl)return toast('Plantilla no encontrada.','err');
+ let col=targetColId?cur().find(c=>c.id===targetColId):(cur().find(c=>isProjCol(c))||cur()[0]);
+ if(!col)return toast('No hay una lista de proyectos disponible. Creá una primero.','err');
+ const name=prompt('Nombre del nuevo proyecto:', tpl.name.replace(/\(Plantilla\)/i,'').trim());
+ if(!name)return;
+ const id=uid('k');
+ const newProj={
+  id,
+  title:name,
+  isSupplier:false,
+  isDesigner:false,
+  designerId:'',
+  phone:'',
+  location:'',
+  notes:tpl.description||'',
+  specialty:'',
+  color:tpl.color||'#ffffff',
+  qty:1,
+  unitPrice:0,
+  fields:[],
+  folderColumns:(tpl.columns||[]).map(fc=>({
+   id:uid('f'),
+   title:fc.title,
+   type:fc.type||'projects',
+   isSecret:false,
+   cards:(fc.cards||[]).map(card=>({
+    id:uid('k'),
+    title:card.title,
+    notes:card.notes||'',
+    qty:card.qty||1,
+    unitPrice:card.unitPrice||0,
+    isSelf:!!card.isSelf,
+    isSupplier:!!card.isSupplier,
+    specialty:card.specialty||'',
+    phone:card.phone||'',
+    location:card.location||'',
+    color:card.color||'#ffffff',
+    fields:[],
+    folderColumns:[]
+   }))
+  })),
+  x:50+(allCards().length%4)*260,
+  y:50+Math.floor(allCards().length/4)*180,
+  isSecret:false,
+  designerAccess:'all',
+  briefData:structuredClone(tpl.briefData||briefDef()),
+  budgetData:structuredClone(tpl.budgetData||bdef()),
+  profitData:{approved:0,costs:[]}
+ };
+ col.cards.push(newProj);
+ save();closeM();render();
+ toast(`Proyecto «${name}» creado a partir de la plantilla.`);
+ A.open({dataset:{id}});
+}
+
+function templatesModal(){
+ const budTemplates=S.templates||[];
+ const projTemplates=S.projectTemplates||[];
+ const curProj=F?locate(F)?.c:null;
+
+ const m=modal(`<h3>📑 Centro de Plantillas</h3>
+  <p class="hint" style="margin:0 0 12px">Creá y utilizá plantillas para acelerar tus proyectos y presupuestos sin empezar de cero.</p>
+  
+  <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--ln);padding-bottom:8px">
+   <button class="b on" id="tabTplBudget" style="font-weight:700">📊 Presupuestos (${budTemplates.length})</button>
+   <button class="b" id="tabTplProject" style="font-weight:700">📁 Proyectos (${projTemplates.length})</button>
+  </div>
+
+  <div id="secTplBudget">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+    <span style="font-size:12px;color:var(--mu)">Plantillas de ítems, horas de diseño y estilos de presupuesto:</span>
+    <button class="b p" id="btnNewBudgetTpl" style="font-size:12px;white-space:nowrap">+ Nueva Plantilla</button>
+   </div>
+   <div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="listBudgetTpls">
+    ${budTemplates.length?budTemplates.map(t=>`
+     <div style="background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0;flex:1">
+       <div style="font-weight:700;font-size:13px">📄 ${esc(t.name)}</div>
+       <div style="font-size:11.5px;color:var(--mu);margin-top:2px">
+        ${(t.data.items||[]).length} ítems cargados · ${t.data.designHours?t.data.designHours+'h diseño':'Sin horas diseño'}
+        ${t.data.notes?` · <span>📝 ${esc(t.data.notes).slice(0,35)}...</span>`:''}
+       </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+       ${curProj?`<button class="b g" data-apply-btpl="${t.id}" style="font-size:11.5px;padding:3px 8px" title="Aplicar al proyecto actual">Aplicar aquí</button>`:''}
+       <button class="ib" data-del-btpl="${t.id}" title="Eliminar plantilla" style="color:var(--dg)">✕</button>
+      </div>
+     </div>`).join(''):'<div class="hint" style="padding:14px;background:var(--cd);border-radius:var(--r);text-align:center">No hay plantillas de presupuesto aún. Podés crear una aquí o guardarla desde el botón 📊 Presupuesto dentro de cualquier proyecto.</div>'}
+   </div>
+  </div>
+
+  <div id="secTplProject" style="display:none">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+    <span style="font-size:12px;color:var(--mu)">Modelos de proyectos con carpetas y etapas predefinidas:</span>
+    <button class="b p" id="btnNewProjTpl" style="font-size:12px;white-space:nowrap">+ Crear Plantilla</button>
+   </div>
+   <div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="listProjTpls">
+    ${projTemplates.length?projTemplates.map(t=>`
+     <div style="background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0;flex:1">
+       <div style="font-weight:700;font-size:13px">📁 ${esc(t.name)}</div>
+       <div style="font-size:11.5px;color:var(--mu);margin-top:2px">
+        ${(t.columns||[]).map(c=>esc(c.title)).join(' · ')}
+        ${t.description?` · <i>${esc(t.description)}</i>`:''}
+       </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+       <button class="b p" data-create-from-ptpl="${t.id}" style="font-size:11.5px;padding:3px 8px" title="Crear un nuevo proyecto con esta estructura">+ Usar</button>
+       <button class="ib" data-del-ptpl="${t.id}" title="Eliminar plantilla" style="color:var(--dg)">✕</button>
+      </div>
+     </div>`).join(''):'<div class="hint" style="padding:14px;background:var(--cd);border-radius:var(--r);text-align:center">No hay plantillas de proyecto todavía. Podés crear una ahora o guardar cualquier proyecto como plantilla.</div>'}
+   </div>
+  </div>
+
+  <div class="acts" style="margin-top:16px"><button class="b" data-act="closeM">Cerrar</button></div>`,'600px');
+
+ const tabB=m.querySelector('#tabTplBudget'),tabP=m.querySelector('#tabTplProject');
+ const secB=m.querySelector('#secTplBudget'),secP=m.querySelector('#secTplProject');
+ tabB.onclick=()=>{tabB.classList.add('on');tabP.classList.remove('on');secB.style.display='block';secP.style.display='none'};
+ tabP.onclick=()=>{tabP.classList.add('on');tabB.classList.remove('on');secP.style.display='block';secB.style.display='none'};
+
+ m.querySelector('#btnNewBudgetTpl')?.addEventListener('click',()=>{
+  const name=prompt('Nombre para la nueva plantilla de presupuesto (ej: Mecanizado CNC básico):');
+  if(!name)return;
+  let data=bdef();
+  if(curProj&&curProj.budgetData)data=structuredClone(curProj.budgetData);
+  S.templates=S.templates||[];
+  S.templates.push({id:uid('t'),name,data});
+  save();closeM();templatesModal();
+  toast(`Plantilla «${name}» creada.`);
+ });
+
+ m.querySelector('#btnNewProjTpl')?.addEventListener('click',()=>{
+  if(curProj){
+   saveProjectTemplate(curProj.id);
+   closeM();templatesModal();
+   return;
+  }
+  const name=prompt('Nombre de la plantilla de proyecto (ej: Diseño Industrial Estándar):');
+  if(!name)return;
+  S.projectTemplates=S.projectTemplates||[];
+  S.projectTemplates.push({
+   id:uid('pt'),name,description:'Plantilla predeterminada con tareas y proveedores.',color:'#ffffff',
+   columns:[
+    {title:'Requerimientos',type:'projects',cards:[{title:'Brief y especificaciones',qty:1,unitPrice:0,color:'#ffffff'}]},
+    {title:'Diseño y Modelado',type:'projects',cards:[{title:'Modelo 3D CAD',qty:1,unitPrice:0,color:'#ffffff'}]},
+    {title:'Proveedores',type:'suppliers',cards:[]}
+   ],
+   briefData:briefDef(),budgetData:bdef()
+  });
+  save();closeM();templatesModal();
+  toast(`Plantilla de proyecto «${name}» creada.`);
+ });
+
+ m.querySelectorAll('[data-apply-btpl]').forEach(btn=>{
+  btn.onclick=()=>{
+   if(!curProj)return;
+   const tpl=(S.templates||[]).find(x=>x.id===btn.dataset.applyBtpl);
+   if(!tpl)return;
+   const B=curProj.budgetData=Object.assign(bdef(),curProj.budgetData);
+   Object.assign(B.style,tpl.data.style||{});
+   B.notes=tpl.data.notes||'';
+   B.designDesc=tpl.data.designDesc||'';
+   B.designHours=tpl.data.designHours||0;
+   B.designRate=tpl.data.designRate||0;
+   B.items=structuredClone(tpl.data.items||[]);
+   save();closeM();render();
+   toast(`Plantilla «${tpl.name}» aplicada al proyecto actual.`);
+   budgetModal(curProj.id);
+  };
+ });
+
+ m.querySelectorAll('[data-del-btpl]').forEach(btn=>{
+  btn.onclick=()=>{
+   const tpl=(S.templates||[]).find(x=>x.id===btn.dataset.delBtpl);
+   if(!tpl||!confirm(`¿Borrar la plantilla «${tpl.name}»?`))return;
+   mark();S.templates=S.templates.filter(x=>x!==tpl);save();closeM();templatesModal();
+   toast('Plantilla de presupuesto borrada.','',undo);
+  };
+ });
+
+ m.querySelectorAll('[data-create-from-ptpl]').forEach(btn=>{
+  btn.onclick=()=>{createProjectFromTemplate(btn.dataset.createFromPtpl);};
+ });
+
+ m.querySelectorAll('[data-del-ptpl]').forEach(btn=>{
+  btn.onclick=()=>{
+   const tpl=(S.projectTemplates||[]).find(x=>x.id===btn.dataset.delPtpl);
+   if(!tpl||!confirm(`¿Borrar la plantilla de proyecto «${tpl.name}»?`))return;
+   mark();S.projectTemplates=S.projectTemplates.filter(x=>x!==tpl);save();closeM();templatesModal();
+   toast('Plantilla de proyecto borrada.','',undo);
+  };
+ });
+}
+
+function suppliersModal(){
+ const sups=getGlobalSuppliers();
+ const isInside=!!F;
+
+ const m=modal(`<h3>🏭 Directorio de Proveedores y Talleres</h3>
+  <p class="hint" style="margin:0 0 10px">Directorio general de talleres, proveedores externos y producción propia (nosotros mismos).</p>
+  
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+   <input type="text" id="supSearch" placeholder="🔍 Buscar por nombre, rubro, contacto..." style="flex:1">
+   <button class="b p" id="btnModalAddSup" style="white-space:nowrap">+ Nuevo Proveedor</button>
+  </div>
+
+  <div style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="supListContainer">
+   ${sups.length?sups.map(s=>`
+    <div class="sup-item-row" data-txt="${esc((s.title+' '+(s.specialty||'')+' '+(s.phone||'')+' '+(s.location||'')).toLowerCase())}" style="background:var(--cd);border:1px solid ${s.isSelf?'#10b981':'var(--ln)'};border-radius:var(--r);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+     <div style="min-width:0;flex:1">
+      <div style="font-weight:700;display:flex;align-items:center;gap:6px">
+       <span>${s.isSelf?'🙋‍♂️ ':'🏭 '}${esc(s.title)}</span>
+       ${s.isSelf?'<span class="badge-self" style="font-size:10px;padding:1px 6px">Nosotros mismos</span>':''}
+       ${s.specialty?`<span class="n" style="font-size:11px;background:var(--pn);padding:2px 6px;border-radius:4px;border:1px solid var(--ln)">${esc(s.specialty)}</span>`:''}
+      </div>
+      <div style="font-size:12px;color:var(--mu);margin-top:3px;display:flex;flex-wrap:wrap;gap:8px">
+       ${s.phone?`<span>📞 ${esc(s.phone)}</span>`:''}
+       ${s.location?`<span>📍 ${esc(s.location)}</span>`:''}
+      </div>
+      ${s.notes?`<div style="font-size:11px;color:var(--mu);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${esc(s.notes)}</div>`:''}
+     </div>
+     <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      ${s.phone?`<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" class="b" style="text-decoration:none;color:var(--ok);font-size:12px;padding:3px 7px" title="Abrir WhatsApp">📲</a>`:''}
+      ${isInside?`<button class="b p" data-assign-sup="${s.id}" style="font-size:12px;padding:4px 8px">+ Asignar al proyecto</button>`:''}
+      <button class="b" data-edit-sup="${s.id}" style="font-size:12px;padding:4px 8px">Editar</button>
+     </div>
+    </div>`).join(''):'<div class="hint" style="text-align:center;padding:18px;background:var(--cd);border-radius:var(--r)">Todavía no registraste ningún proveedor. Tocá el botón "+ Nuevo Proveedor" para registrar el primero.</div>'}
+  </div>
+
+  <div class="acts" style="margin-top:14px"><button class="b" data-act="closeM">Cerrar</button></div>`,'650px');
+
+ const sInp=m.querySelector('#supSearch');
+ if(sInp){
+  sInp.oninput=()=>{
+   const q=sInp.value.toLowerCase().trim();
+   m.querySelectorAll('.sup-item-row').forEach(row=>{
+    row.style.display=(!q||row.dataset.txt.includes(q))?'flex':'none';
+   });
+  };
+ }
+
+ m.querySelector('#btnModalAddSup')?.addEventListener('click',()=>{
+  newSupplierModal(()=>{closeM();suppliersModal();});
+ });
+
+ m.querySelectorAll('[data-edit-sup]').forEach(btn=>{
+  btn.onclick=()=>{closeM();editCard(btn.dataset.editSup);};
+ });
+
+ m.querySelectorAll('[data-assign-sup]').forEach(btn=>{
+  btn.onclick=()=>{
+   if(!F)return;
+   const s=getGlobalSuppliers().find(x=>x.id===btn.dataset.assignSup);
+   if(!s)return;
+   const pr=locate(F)?.c;
+   if(!pr)return;
+   let suppCol=(pr.folderColumns||[]).find(c=>isSuppCol(c));
+   if(!suppCol){
+    suppCol={id:uid('f'),title:'Proveedores',type:'suppliers',cards:[]};
+    (pr.folderColumns=pr.folderColumns||[]).push(suppCol);
+   }
+   const id=uid('k');
+   const k={id,title:s.title,specialty:s.specialty||'',phone:s.phone||'',location:s.location||'',notes:s.notes||'',supplierId:s.id,isSupplier:true,isSelf:!!s.isSelf,qty:1,unitPrice:0,color:s.color||(s.isSelf?'#10b981':'#ffffff'),fields:[],folderColumns:[]};
+   suppCol.cards.push(k);
+   save();closeM();render();editCard(id);
+   toast(`Proveedor «${s.title}» asignado al proyecto.`);
+  };
+ });
+}
+
+function newSupplierModal(cb){
+ const m=modal(`<h3>🏭 Registrar Nuevo Proveedor</h3>
+  <p class="hint" style="margin:0 0 10px">Ingresá los datos del taller o proveedor. Quedará disponible para llamarlo a cualquier proyecto.</p>
+  
+  <div class="box" style="background:var(--cd);border-left:4px solid #3b82f6;padding:8px 12px;margin-bottom:12px" id="newSupSelfBox">
+   <label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+    <div>
+     <b style="font-size:13px" id="newSupSelfTitle">🏭 Taller o Proveedor Externo</b>
+     <div class="hint" style="margin:2px 0 0;font-size:11.5px" id="newSupSelfHint">Gasto a terceros que resta de la ganancia del proyecto.</div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700">
+     <input type="checkbox" id="chkNewSupSelf" style="width:auto;cursor:pointer">
+     <span style="font-size:12px">🙋‍♂️ Somos nosotros mismos</span>
+    </label>
+   </label>
+  </div>
+
+  <div class="f"><label>Nombre del proveedor / Razón social o Taller:</label><input id="newSupName" placeholder="Ej: Metalúrgica San Martín, Corte Láser CNC..." required></div>
+  <div class="row">
+   <div class="f"><label>Rubro / Especialidad:</label><input id="newSupSpec" placeholder="Ej: Plegado de chapa, Pintura en polvo, Tornería..."></div>
+   <div class="f"><label>Teléfono / WhatsApp:</label><input id="newSupPhone" placeholder="Ej: +54 9 351 1234567"></div>
+  </div>
+  <div class="f"><label>Ubicación / Dirección:</label><input id="newSupLoc" placeholder="Ej: Av. Vélez Sarsfield 2500, Córdoba"></div>
+  <div class="f"><label>Anotaciones extras / Horarios / Contacto:</label><textarea id="newSupNotes" rows="2" placeholder="Persona de contacto, condiciones comerciales, tiempos de entrega..."></textarea></div>
+
+  <div class="acts">
+   <button class="b" data-act="closeM">Cancelar</button>
+   <button class="b p" id="btnSaveNewSup">Guardar Proveedor</button>
+  </div>`,'540px');
+
+ m.querySelector('#chkNewSupSelf').onchange=e=>{
+  const on=e.target.checked;
+  const box=m.querySelector('#newSupSelfBox');
+  const title=m.querySelector('#newSupSelfTitle');
+  const hint=m.querySelector('#newSupSelfHint');
+  box.style.borderLeftColor=on?'#10b981':'#3b82f6';
+  title.textContent=on?'🙋‍♂️ Proveedor Propio (Nosotros mismos)':'🏭 Taller o Proveedor Externo';
+  title.style.color=on?'#10b981':'var(--tx)';
+  hint.textContent=on?'Producción interna: Este gasto suma a la ganancia en vez de restar.':'Gasto a terceros que resta de la ganancia del proyecto.';
+  if(on&&!m.querySelector('#newSupName').value)m.querySelector('#newSupName').value='Nosotros mismos';
+ };
+
+ m.querySelector('#btnSaveNewSup').onclick=()=>{
+  const name=m.querySelector('#newSupName').value.trim();
+  if(!name)return toast('Ingresá el nombre del proveedor.','err');
+  const isSelf=m.querySelector('#chkNewSupSelf').checked;
+  const spec=m.querySelector('#newSupSpec').value.trim();
+  const phone=m.querySelector('#newSupPhone').value.trim();
+  const loc=m.querySelector('#newSupLoc').value.trim();
+  const notes=m.querySelector('#newSupNotes').value.trim();
+
+  let suppCol=(S.columns||[]).find(c=>isSuppCol(c));
+  if(!suppCol){
+   suppCol={id:uid('l'),title:'Proveedores',type:'suppliers',isSecret:false,cards:[]};
+   S.columns.push(suppCol);
+  }
+
+  const id=uid('k');
+  const k={
+   id,title:name,specialty:spec,phone,location:loc,notes,
+   isSupplier:true,isDesigner:false,isSelf,
+   color:isSelf?'#10b981':'#ffffff',qty:1,unitPrice:0,fields:[],folderColumns:[],
+   isSecret:false,designerAccess:'all'
+  };
+
+  suppCol.cards.push(k);
+  save();closeM();render();
+  toast(`Proveedor «${name}» registrado en el directorio.`);
+  if(cb)cb(k);
+ };
+}
+
 /* ---------- Presupuesto ---------- */
-function budgetModal(id){if(ROLE==='designer'&&S.security?.hideFinancesFromDesigner)return toast('Acceso restringido en Modo Diseñador.','err');const c=locate(id).c;const B=c.budgetData=Object.assign(bdef(),c.budgetData);B.style=Object.assign({},bdef().style,B.style);
+function budgetModal(id){const c=locate(id).c;const B=c.budgetData=Object.assign(bdef(),c.budgetData);B.style=Object.assign({},bdef().style,B.style);
  const inp=(k,l,t)=>`<div class="f"><label>${l}</label><input data-b="${k}" type="${t||'text'}" value="${esc(B[k])}"></div>`,sin=(k,l,t)=>`<div class="f"><label>${l}</label><input data-s="${k}" type="${t||'text'}" value="${esc(B.style[k])}"></div>`;
  const m=modal(`<h3>Presupuesto · ${esc(c.title)}</h3>
  <div class="box row" style="align-items:end"><div class="f" style="margin:0"><label>Plantilla</label><select id="tp"><option value="">— elegir plantilla —</option>${S.templates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
